@@ -493,7 +493,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   renderSlots();
 
-  // Logika Drag & Drop Stiker DOM
   // Logika Drag, Resize & Rotate Stiker DOM
   let activeSticker = null;
   let isDragging = false,
@@ -1344,7 +1343,7 @@ document.addEventListener("DOMContentLoaded", () => {
           // Cetak Teks Custom & Tanggal
           let footerText = customTextInput.value.trim();
 
-          // 1. CEK TEKS DEFAULT TEMA TERLEBIH DAHULU 
+          // 1. CEK TEKS DEFAULT TEMA TERLEBIH DAHULU
           if (!footerText) {
             if (currentTheme === "neko") footerText = "Purr-fect Memories 🐾";
             if (currentTheme === "cafe") footerText = "Coffee & Memories ☕";
@@ -1358,7 +1357,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (currentTheme === "wanted") footerText = "$1,000,000 REWARD";
           }
 
-          // 2. SIAPKAN TANGGAL
+          // 2. AMBIL TANGGAL (JIKA DICENTANG)
           let dateStr = "";
           if (showDateCheck.checked) {
             dateStr = new Date().toLocaleDateString("id-ID", {
@@ -1368,10 +1367,11 @@ document.addEventListener("DOMContentLoaded", () => {
             });
           }
 
-          // 3. TAMPILKAN TEKS DAN TANGGAL SECARA TERPISAH
+          // 3. RENDER TEKS KE CANVAS (Hanya 1x Render)
           if (footerText !== "" || dateStr !== "") {
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
+            
             let textColor = "#5c4b51";
             let fontStyle = 'bold 28px "Nunito"';
 
@@ -1426,30 +1426,30 @@ document.addEventListener("DOMContentLoaded", () => {
 
             ctx.fillStyle = textColor;
 
-            // Hitung Titik Tengah Vertikal (Y)
+            // Hitung Posisi (Y)
             let textY = canvas.height - paddingBottom / 2;
             let dateY = textY;
 
-            // Jika ada teks DAN tanggal, pisahkan posisinya (teks utama ditarik ke atas, tanggal diturunkan)
+            // Jika KEDUANYA ADA (teks dan tanggal), pisahkan posisinya atas-bawah
             if (footerText !== "" && dateStr !== "") {
-              textY = canvas.height - (paddingBottom / 2) - 15; // Teks utama naik
-              dateY = canvas.height - (paddingBottom / 2) + 20; // Tanggal turun
+              textY = canvas.height - (paddingBottom / 2) - 15; 
+              dateY = canvas.height - (paddingBottom / 2) + 20; 
             }
 
-            // Cetak Teks Utama
+            // -- EKSEKUSI GAMBAR TEKS UTAMA --
             if (footerText !== "") {
               ctx.font = fontStyle;
               ctx.fillText(footerText, canvas.width / 2, textY);
             }
 
-            // Cetak Tanggal (di baris bawah)
+            // -- EKSEKUSI GAMBAR TANGGAL --
             if (dateStr !== "") {
-              // Trik: Mengubah angka ukuran px di fontStyle tema menjadi ukuran 18px khusus untuk tanggal
               ctx.font = fontStyle.replace(/\d+px/, "18px"); 
-              ctx.globalAlpha = 0.8; // Dibuat sedikit transparan agar lebih estetik
+              ctx.globalAlpha = 0.8; 
               ctx.fillText(dateStr, canvas.width / 2, dateY);
-              ctx.globalAlpha = 1.0; // Reset ke normal
+              ctx.globalAlpha = 1.0; 
             }
+          }
           
 
             if (!footerText) {
