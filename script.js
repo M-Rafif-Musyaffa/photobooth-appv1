@@ -1163,7 +1163,6 @@ document.addEventListener("DOMContentLoaded", () => {
           ctx.shadowBlur = 15;
           ctx.shadowOffsetX = 5;
           ctx.shadowOffsetY = 5;
-          // Gambar ulang foto dengan shadow (karena drawImage sudah dipanggil sebelumnya, kita timpa border soft)
           ctx.strokeStyle = "rgba(255,255,255,0.8)";
           ctx.lineWidth = 4;
           ctx.strokeRect(drawX, drawY, photoWidth, photoHeight);
@@ -1378,52 +1377,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // -- Kumpulan Tema Font --
             if (currentTheme === "film") textColor = "#ffffff";
-            if (currentTheme === "pixel") {
-              textColor = "#39ff14";
-              fontStyle = 'bold 24px "Courier New"';
-            }
+            if (currentTheme === "pixel") { textColor = "#39ff14"; fontStyle = 'bold 24px "Courier New"'; }
             if (currentTheme === "retro-os") fontStyle = 'bold 20px "Courier New"';
             if (currentTheme === "galaxy") textColor = "#ffffff";
-            if (currentTheme === "newspaper") {
-              textColor = "#111111";
-              fontStyle = 'bold 30px "Times New Roman"';
-            }
-            if (currentTheme === "cyberpunk") {
-              textColor = "#00ffff";
-              fontStyle = 'bold 24px "Courier New"';
-            }
-            if (currentTheme === "love") {
-              textColor = "#ffffff";
-              fontStyle = 'bold 32px "Comic Sans MS", cursive, sans-serif';
-            }
-            if (currentTheme === "watercolor") {
-              textColor = "#4a4a4a";
-              fontStyle = 'italic 26px "Georgia", serif';
-            }
-            if (currentTheme === "vhs") {
-              textColor = "#00ff00";
-              fontStyle = 'bold 22px "Courier New", monospace';
-            }
-            if (currentTheme === "sakura") {
-              textColor = "#d81b60";
-              fontStyle = 'bold 28px "Noto Serif JP", serif';
-            }
-            if (currentTheme === "cafe") {
-              textColor = "#6b4c3b";
-              fontStyle = 'bold 26px "Georgia", serif';
-            }
-            if (currentTheme === "polaroid") {
-              textColor = "#2c2c2c";
-              fontStyle = 'bold 22px "Courier New", monospace';
-            }
-            if (currentTheme === "tropical") {
-              textColor = "#e8913a";
-              fontStyle = 'bold 28px "Nunito", sans-serif';
-            }
-            if (currentTheme === "wanted") {
-              textColor = "#4a2e15";
-              fontStyle = 'bold 45px "Times New Roman", serif';
-            }
+            if (currentTheme === "newspaper") { textColor = "#111111"; fontStyle = 'bold 30px "Times New Roman"'; }
+            if (currentTheme === "cyberpunk") { textColor = "#00ffff"; fontStyle = 'bold 24px "Courier New"'; }
+            if (currentTheme === "love") { textColor = "#ffffff"; fontStyle = 'bold 32px "Comic Sans MS", cursive, sans-serif'; }
+            if (currentTheme === "watercolor") { textColor = "#4a4a4a"; fontStyle = 'italic 26px "Georgia", serif'; }
+            if (currentTheme === "vhs") { textColor = "#00ff00"; fontStyle = 'bold 22px "Courier New", monospace'; }
+            if (currentTheme === "sakura") { textColor = "#d81b60"; fontStyle = 'bold 28px "Noto Serif JP", serif'; }
+            if (currentTheme === "cafe") { textColor = "#6b4c3b"; fontStyle = 'bold 26px "Georgia", serif'; }
+            if (currentTheme === "polaroid") { textColor = "#2c2c2c"; fontStyle = 'bold 22px "Courier New", monospace'; }
+            if (currentTheme === "tropical") { textColor = "#e8913a"; fontStyle = 'bold 28px "Nunito", sans-serif'; }
+            if (currentTheme === "wanted") { textColor = "#4a2e15"; fontStyle = 'bold 45px "Times New Roman", serif'; }
 
             ctx.fillStyle = textColor;
 
@@ -1431,7 +1397,7 @@ document.addEventListener("DOMContentLoaded", () => {
             let textY = canvas.height - paddingBottom / 2;
             let dateY = textY;
 
-            // Jika KEDUANYA ADA (teks dan tanggal), pisahkan posisinya atas-bawah
+            // Jika KEDUANYA ADA, pisahkan posisinya atas-bawah
             if (footerText !== "" && dateStr !== "") {
               textY = canvas.height - (paddingBottom / 2) - 15; 
               dateY = canvas.height - (paddingBottom / 2) + 20; 
