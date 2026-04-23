@@ -1,40 +1,42 @@
 document.addEventListener("DOMContentLoaded", () => {
-  
   // ==========================================
-// 1.1 LOGIKA MENU MOBILE (Slide & Overlay)
-// ==========================================
-const menuToggle = document.getElementById("menu-toggle");
-const sidebar = document.querySelector(".cute-navbar");
-const overlay = document.getElementById("menu-overlay");
+  // 1.1 LOGIKA MENU MOBILE (Slide & Overlay)
+  // ==========================================
+  const menuToggle = document.getElementById("menu-toggle");
+  const sidebar = document.querySelector(".cute-navbar");
+  const overlay = document.getElementById("menu-overlay");
 
-if (menuToggle) {
-  menuToggle.addEventListener("click", () => {
-    const isOpen = sidebar.classList.toggle("open");
-    overlay.classList.toggle("active");
-    menuToggle.textContent = isOpen ? "✕" : "☰";
-    menuToggle.classList.toggle("active");
-  });
+  if (menuToggle) {
+    menuToggle.addEventListener("click", () => {
+      const isOpen = sidebar.classList.toggle("open");
+      overlay.classList.toggle("active");
+      menuToggle.textContent = isOpen ? "✕" : "☰";
+      menuToggle.classList.toggle("active");
+    });
 
-  overlay.addEventListener("click", () => {
-    sidebar.classList.remove("open");
-    overlay.classList.remove("active");
-    menuToggle.textContent = "☰";
-    menuToggle.classList.remove("active");
-  });
+    overlay.addEventListener("click", () => {
+      sidebar.classList.remove("open");
+      overlay.classList.remove("active");
+      menuToggle.textContent = "☰";
+      menuToggle.classList.remove("active");
+    });
 
-  // Tutup menu otomatis saat user memilih setting
-  sidebar.addEventListener("click", (e) => {
-    if (e.target.matches("button, input, .card-option") && sidebar.classList.contains("open")) {
-      // Beri jeda kecil agar klik setting terekam dulu
-      setTimeout(() => {
-        sidebar.classList.remove("open");
-        overlay.classList.remove("active");
-        menuToggle.textContent = "☰";
-        menuToggle.classList.remove("active");
-      }, 300);
-    }
-  });
-}
+    // Tutup menu otomatis saat user memilih setting
+    sidebar.addEventListener("click", (e) => {
+      if (
+        e.target.matches("button, input, .card-option") &&
+        sidebar.classList.contains("open")
+      ) {
+        // Beri jeda kecil agar klik setting terekam dulu
+        setTimeout(() => {
+          sidebar.classList.remove("open");
+          overlay.classList.remove("active");
+          menuToggle.textContent = "☰";
+          menuToggle.classList.remove("active");
+        }, 300);
+      }
+    });
+  }
   // ==========================================
   // 1. ELEMEN DOM & STATE APLIKASI
   // ==========================================
@@ -305,6 +307,129 @@ if (menuToggle) {
           arCtx.fill();
 
           arCtx.restore();
+        } else if (currentAR === "bunny") {
+          // --- 🐰 FILTER BUNNY CUTE (KELINCI) ---
+          const nose = landmarks[1]; // Titik ujung hidung
+
+          arCtx.save();
+          arCtx.translate(nose.x * w, nose.y * h);
+          arCtx.rotate(faceAngle);
+
+          // 1. Blush On (Pipi merah muda transparan di bawah mata)
+          arCtx.fillStyle = "rgba(255, 142, 170, 0.4)";
+
+          // Pipi Kiri
+          arCtx.beginPath();
+          arCtx.ellipse(
+            -faceScale * 0.35,
+            faceScale * 0.1,
+            faceScale * 0.2,
+            faceScale * 0.1,
+            0,
+            0,
+            Math.PI * 2,
+          );
+          arCtx.fill();
+
+          // Pipi Kanan
+          arCtx.beginPath();
+          arCtx.ellipse(
+            faceScale * 0.35,
+            faceScale * 0.1,
+            faceScale * 0.2,
+            faceScale * 0.1,
+            0,
+            0,
+            Math.PI * 2,
+          );
+          arCtx.fill();
+
+          // 2. Hidung Kelinci (Oval Pink Kecil)
+          arCtx.fillStyle = "#ffb6c1";
+          arCtx.beginPath();
+          arCtx.ellipse(
+            0,
+            0,
+            faceScale * 0.12,
+            faceScale * 0.08,
+            0,
+            0,
+            Math.PI * 2,
+          );
+          arCtx.fill();
+
+          arCtx.restore();
+
+          // 3. Gigi Kelinci (Di Bibir Atas)
+          const upperLip = landmarks[13]; // Landmark 13 = bagian tengah bibir atas
+
+          arCtx.save();
+          arCtx.translate(upperLip.x * w, upperLip.y * h);
+          arCtx.rotate(faceAngle);
+
+          arCtx.fillStyle = "#ffffff";
+          arCtx.strokeStyle = "rgba(0, 0, 0, 0.3)"; // Garis tepi gigi
+          arCtx.lineWidth = 1.5;
+
+          // Gigi Kiri
+          arCtx.beginPath();
+          arCtx.rect(-faceScale * 0.035, 0, faceScale * 0.03, faceScale * 0.09);
+          arCtx.fill();
+          arCtx.stroke();
+
+          // Gigi Kanan
+          arCtx.beginPath();
+          arCtx.rect(faceScale * 0.005, 0, faceScale * 0.03, faceScale * 0.09);
+          arCtx.fill();
+          arCtx.stroke();
+
+          arCtx.restore(); // <--- Lepas dari patokan bibir
+
+          // 4. Telinga Kelinci (Panjang ke atas)
+          const leftForehead = landmarks[103];
+          const rightForehead = landmarks[332];
+
+          const drawBunnyEar = (point, tilt) => {
+            arCtx.save();
+            arCtx.translate(point.x * w, point.y * h);
+            arCtx.rotate(faceAngle + tilt);
+
+            // Telinga Luar (Putih dengan border pink)
+            arCtx.fillStyle = "#ffffff";
+            arCtx.strokeStyle = "#ff8eaa";
+            arCtx.lineWidth = 2.5;
+            arCtx.beginPath();
+            arCtx.ellipse(
+              0,
+              -faceScale * 0.65,
+              faceScale * 0.15,
+              faceScale * 0.55,
+              0,
+              0,
+              Math.PI * 2,
+            );
+            arCtx.fill();
+            arCtx.stroke();
+
+            // Telinga Dalam (Pink)
+            arCtx.fillStyle = "#ffb6c1";
+            arCtx.beginPath();
+            arCtx.ellipse(
+              0,
+              -faceScale * 0.6,
+              faceScale * 0.07,
+              faceScale * 0.4,
+              0,
+              0,
+              Math.PI * 2,
+            );
+            arCtx.fill();
+
+            arCtx.restore();
+          };
+
+          drawBunnyEar(leftForehead, -0.15); // Telinga kiri miring sedikit
+          drawBunnyEar(rightForehead, 0.15); // Telinga kanan miring sedikit
         }
       }
     }
@@ -735,6 +860,12 @@ if (menuToggle) {
       paddingBottom = 130;
       paddingX = 45;
     }
+    if (currentTheme === "wanted") {
+      bgColor = "#f4e8d1";
+      paddingTop = 180;
+      paddingBottom = 130;
+      paddingX = 45;
+    }
 
     const photoWidth = 520;
     const photoHeight = photoWidth / currentRatio;
@@ -1091,7 +1222,6 @@ if (menuToggle) {
           );
           ctx.shadowColor = "transparent";
 
-          // Re-draw foto di atas white frame
           ctx.drawImage(img, drawX, drawY, photoWidth, photoHeight);
         }
         if (currentTheme === "tropical") {
@@ -1106,6 +1236,25 @@ if (menuToggle) {
           ctx.lineTo(drawX + photoWidth + 20, drawY + photoHeight + 20);
           ctx.closePath();
           ctx.fill();
+        }
+        if (currentTheme === "wanted") {
+          // Garis tepi ganda ala poster buronan
+          ctx.strokeStyle = "#4a2e15";
+          ctx.lineWidth = 12;
+          ctx.strokeRect(15, 15, canvas.width - 30, canvas.height - 30);
+          ctx.lineWidth = 4;
+          ctx.strokeRect(35, 35, canvas.width - 70, canvas.height - 70);
+
+          // Teks WANTED
+          ctx.fillStyle = "#4a2e15";
+          ctx.font = 'bold 80px "Times New Roman", serif';
+          ctx.textAlign = "center";
+          ctx.textBaseline = "top";
+          ctx.fillText("WANTED", canvas.width / 2, 50);
+
+          // Teks DEAD OR ALIVE
+          ctx.font = 'bold 28px "Times New Roman", serif';
+          ctx.fillText("DEAD OR ALIVE", canvas.width / 2, 130);
         }
 
         imagesLoaded++;
@@ -1207,7 +1356,15 @@ if (menuToggle) {
             footerText ||
             currentTheme === "neko" ||
             currentTheme === "galaxy" ||
-            currentTheme === "pixel"
+            currentTheme === "pixel" ||
+            currentTheme === "cafe" ||
+            currentTheme === "polaroid" ||
+            currentTheme === "tropical" ||
+            currentTheme === "galaxy" ||
+            currentTheme === "watercolor" ||
+            currentTheme === "vhs" ||
+            currentTheme === "sakura"||
+            currentTheme === "wanted"
           ) {
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
@@ -1259,6 +1416,11 @@ if (menuToggle) {
               textColor = "#e8913a";
               fontStyle = 'bold 28px "Nunito", sans-serif';
             }
+            if (currentTheme === "wanted") {
+              textColor = "#4a2e15";
+              fontStyle = 'bold 45px "Times New Roman", serif';
+            }
+
 
             ctx.fillStyle = textColor;
             ctx.font = fontStyle;
@@ -1275,6 +1437,7 @@ if (menuToggle) {
                 footerText = "Art in Every Moment 🎨";
               if (currentTheme === "vhs") footerText = "PLAY ▶ 1998";
               if (currentTheme === "sakura") footerText = "桜の季節 🌸";
+              if (currentTheme === "wanted") footerText = "$1,000,000 REWARD";
             }
             ctx.fillText(
               footerText,
