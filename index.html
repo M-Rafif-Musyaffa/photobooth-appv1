@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Photobooth AI Pro</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"
+      crossorigin="anonymous"
+    ></script>
+  </head>
+  <body>
+    <button
+      id="menu-toggle"
+      class="mobile-menu-btn"
+      aria-label="Buka Pengaturan"
+    >
+      ☰
+    </button>
+    <div id="menu-overlay" class="menu-overlay"></div>
+    <div class="app-dashboard">
+      <aside class="cute-navbar">
+        <div class="brand-section">
+          <h1>✨ Pic Booth</h1>
+          <p>Studio Foto Imutmu</p>
+        </div>
+
+        <div class="menu-group">
+          <label>1. Ukuran Per-Foto</label>
+          <div class="pill-selector" id="ratio-selector">
+            <button class="ratio-btn" data-value="4/3">4:3</button>
+            <button class="ratio-btn active" data-value="3/4">3:4</button>
+            <button class="ratio-btn" data-value="1/1">1:1</button>
+            <button class="ratio-btn" data-value="16/9">16:9</button>
+            <button class="ratio-btn" data-value="9/16">9:16</button>
+          </div>
+        </div>
+
+        <div class="menu-group">
+          <label>2. Jumlah Foto</label>
+          <div class="pill-selector" id="count-selector">
+            <button class="count-btn" data-value="1">1</button>
+            <button class="count-btn" data-value="2">2</button>
+            <button class="count-btn active" data-value="3">3</button>
+            <button class="count-btn" data-value="4">4</button>
+            <button class="count-btn" data-value="5">5</button>
+          </div>
+        </div>
+
+        <div class="menu-group">
+          <label>3. Susunan Bingkai</label>
+          <div class="pill-selector" id="orientation-selector">
+            <button class="orient-btn active" data-value="vertical">
+              ⬇️ Menurun
+            </button>
+            <button class="orient-btn" data-value="horizontal">
+              ➡️ Menyamping
+            </button>
+          </div>
+        </div>
+
+        <div class="menu-group">
+          <label>4. Pilih Tema Unik</label>
+          <div class="card-selector grid-selector" id="theme-selector">
+            <div class="card-option active" data-value="scrapbook">
+              <span>📔 Scrapbook</span>
+            </div>
+            <div class="card-option" data-value="retro-os">
+              <span>💻 Retro OS</span>
+            </div>
+            <div class="card-option" data-value="neko">
+              <span>🐾 Neko Paws</span>
+            </div>
+            <div class="card-option" data-value="film">
+              <span>🎞️ Film Strip</span>
+            </div>
+            <div class="card-option" data-value="pixel">
+              <span>👾 8-Bit</span>
+            </div>
+            <div class="card-option" data-value="cozy">
+              <span>🍃 Cozy</span>
+            </div>
+            <div class="card-option" data-value="galaxy">
+              <span>🌌 Galaxy</span>
+            </div>
+            <div class="card-option" data-value="dots">
+              <span>🎀 Cute Dots</span>
+            </div>
+            <div class="card-option" data-value="newspaper">
+              <span>📰 Newspaper</span>
+            </div>
+            <div class="card-option" data-value="love">
+              <span>💖 True Love</span>
+            </div>
+            <div class="card-option" data-value="cyberpunk">
+              <span>⚡ Cyberpunk</span>
+            </div>
+            <div class="card-option" data-value="watercolor">
+              <span>🎨 Watercolor</span>
+            </div>
+            <div class="card-option" data-value="vhs">
+              <span>📼 VHS Retro</span>
+            </div>
+            <div class="card-option" data-value="sakura">
+              <span>🌸 Sakura</span>
+            </div>
+            <div class="card-option" data-value="cafe">
+              <span>☕ Cafe</span>
+            </div>
+            <div class="card-option" data-value="polaroid">
+              <span>📷 Polaroid</span>
+            </div>
+            <div class="card-option" data-value="tropical">
+              <span>🌴 Tropical</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="menu-group">
+          <label>5. Efek Filter Foto 🌸</label>
+          <div class="pill-selector" id="filter-selector">
+            <button class="filter-btn active" data-filter="none">Normal</button>
+            <button
+              class="filter-btn"
+              data-filter="contrast(1.1) brightness(1.1) saturate(1.3) hue-rotate(-10deg)"
+            >
+              🌸 Peach
+            </button>
+            <button
+              class="filter-btn"
+              data-filter="brightness(1.2) saturate(0.8) contrast(0.9)"
+            >
+              ☁️ Fairy
+            </button>
+            <button
+              class="filter-btn"
+              data-filter="sepia(0.6) contrast(1.1) brightness(0.9) saturate(1.5)"
+            >
+              🎞️ Vintage
+            </button>
+            <button
+              class="filter-btn"
+              data-filter="grayscale(1) contrast(1.2) brightness(1.1)"
+            >
+              🎬 Noir
+            </button>
+
+            <button
+              class="filter-btn"
+              data-filter="sepia(0.3) hue-rotate(180deg) saturate(1.2) contrast(1.1)"
+            >
+              🌊 Ocean
+            </button>
+            <button
+              class="filter-btn"
+              data-filter="sepia(0.4) saturate(1.6) contrast(1.1) brightness(1.1) hue-rotate(-10deg)"
+            >
+              🌇 Golden
+            </button>
+            <button
+              class="filter-btn"
+              data-filter="saturate(2.5) contrast(1.2) hue-rotate(320deg)"
+            >
+              🔮 Neon
+            </button>
+            <button
+              class="filter-btn"
+              data-filter="sepia(0.3) saturate(1.2) brightness(1.05) hue-rotate(40deg)"
+            >
+              🍵 Matcha Latte
+            </button>
+
+            <button
+              class="filter-btn"
+              data-filter="contrast(1.2) saturate(0.8) sepia(0.2) brightness(0.9)"
+            >
+              🎞️ Cinematic
+            </button>
+
+            <button
+              class="filter-btn"
+              data-filter="brightness(1.1) saturate(1.5) contrast(0.95) hue-rotate(-10deg)"
+            >
+              🍭 Candy Pop
+            </button>
+
+            <button
+              class="filter-btn"
+              data-filter="brightness(1.2) contrast(1.1) saturate(0.6) hue-rotate(190deg)"
+            >
+              ❄️ Ice Crystal
+            </button>
+
+            <button
+              class="filter-btn"
+              data-filter="sepia(0.4) brightness(0.95) contrast(1.1) saturate(1.1)"
+            >
+              ☕ Coffee Mood
+            </button>
+          </div>
+        </div>
+
+        <div class="menu-group">
+          <label>6. Teks Kustom & Tanggal ✍️</label>
+          <input
+            type="text"
+            id="custom-text-input"
+            class="cute-input"
+            placeholder="Misal: Ngedate Bareng Ayang 💖"
+            maxlength="30"
+          />
+          <div class="checkbox-group">
+            <input type="checkbox" id="show-date-check" checked />
+            <label for="show-date-check">Tampilkan Tanggal Hari Ini</label>
+          </div>
+        </div>
+
+        <div class="menu-group">
+          <label>7. Hias dengan Stiker 🎨</label>
+          <p class="hint-text">
+            🖱️ Drag = Geser &nbsp;|&nbsp; 🔄 Shift+Drag = Putar &nbsp;|&nbsp; 🔍
+            Scroll = Resize &nbsp;|&nbsp; 🗑️ DblClick = Hapus
+          </p>
+          <div class="sticker-tray">
+            <!-- 🐾 Cute & Nature -->
+            <button class="add-sticker-btn">🐾</button>
+            <button class="add-sticker-btn">🐱</button>
+            <button class="add-sticker-btn">🐶</button>
+            <button class="add-sticker-btn">🦋</button>
+            <button class="add-sticker-btn">🌸</button>
+            <button class="add-sticker-btn">🌼</button>
+            <button class="add-sticker-btn">🍀</button>
+            <!-- ✨ Sparkles & Magic -->
+            <button class="add-sticker-btn">✨</button>
+            <button class="add-sticker-btn">💫</button>
+            <button class="add-sticker-btn">⭐</button>
+            <button class="add-sticker-btn">🌈</button>
+            <button class="add-sticker-btn">🌙</button>
+            <button class="add-sticker-btn">☁️</button>
+            <!-- 💖 Love & Vibe -->
+            <button class="add-sticker-btn">💖</button>
+            <button class="add-sticker-btn">🤍</button>
+            <button class="add-sticker-btn">🩵</button>
+            <button class="add-sticker-btn">🩷</button>
+            <button class="add-sticker-btn">🎀</button>
+            <button class="add-sticker-btn">👑</button>
+            <!-- 📸 Objects & Aesthetic -->
+            <button class="add-sticker-btn">🕶️</button>
+            <button class="add-sticker-btn">📷</button>
+            <button class="add-sticker-btn">☕</button>
+            <button class="add-sticker-btn">🍰</button>
+            <button class="add-sticker-btn">🎵</button>
+            <button class="add-sticker-btn">🎧</button>
+            <button class="add-sticker-btn">🪄</button>
+          </div>
+        </div>
+        <div class="menu-group">
+          <label>8. Filter AR Wajah (AI) 🎭</label>
+          <div class="pill-selector" id="ar-selector">
+            <button class="ar-btn active" data-ar="none">Off</button>
+            <button class="ar-btn" data-ar="neko">🐾 Neko Face</button>
+            <button class="ar-btn" data-ar="glasses">🕶️ Cool Glasses</button>
+          </div>
+        </div>
+      </aside>
+
+      <main class="workspace-section">
+        <header class="workspace-header">
+          <h2>Selamat Datang!</h2>
+          <p>Jepret fotomu, lalu pasang di susunan bingkai sebelah kanan.</p>
+        </header>
+
+        <div class="main-content">
+          <div class="camera-panel">
+            <div class="video-wrapper">
+              <video id="camera-stream" autoplay playsinline></video>
+              <canvas id="ar-overlay"></canvas>
+
+              <div id="countdown-display" class="countdown-text"></div>
+              <div id="flash-overlay"></div>
+            </div>
+            <div class="gallery-section">
+              <h3>Galeri Jepretan 👇 (Klik foto)</h3>
+              <div id="photo-gallery" class="gallery"></div>
+            </div>
+            <button id="capture-btn" class="btn-primary context-btn">
+              📸 Jepret Foto!
+            </button>
+          </div>
+
+          <div class="frame-panel">
+            <div
+              id="frame-workspace"
+              class="frame-strip layout-vertical theme-scrapbook"
+            >
+              <div
+                id="frame-workspace"
+                class="frame-strip theme-scrapbook layout-vertical"
+              ></div>
+            </div>
+            <div class="panel-actions">
+              <button id="generate-btn" class="action-btn btn-download">
+                💖 Cetak & Download
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <canvas id="render-canvas" style="display: none"></canvas>
+      </main>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
