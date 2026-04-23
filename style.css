@@ -231,7 +231,8 @@ button:active {
   background: transparent;
   width: 100%;
   display: flex;
-  justify-content: flex-start;
+  flex-direction: column;
+  align-items: center; 
   overflow-x: auto;
   padding-bottom: 20px;
 }
@@ -640,7 +641,6 @@ h3 {
 /* --- DRAGGABLE STICKERS DI WORKSPACE --- */
 #frame-workspace {
   position: relative;
-  /* Penting agar stiker tidak keluar batas */
   overflow: hidden;
 }
 
@@ -667,7 +667,6 @@ h3 {
 
 .video-wrapper {
   position: relative;
-  /* Penting agar kanvas absolut bisa menempel di dalamnya */
 }
 
 #ar-overlay {
@@ -754,13 +753,13 @@ h3 {
   .mobile-menu-btn, .menu-overlay { display: none !important; }
   .action-wrapper { margin-top: auto; flex-direction: column; }
 }
-/* --- TOMBOL KONTEKSTUAL (BARU) --- */
+/* --- TOMBOL KONTEKS --- */
 .context-btn {
-    width: 100%;           /* Full width agar mudah dipencet */
+    width: 100%;          
     margin-top: 15px;
     padding: 14px;
-    font-size: 16px;       /* Font lebih besar */
-    border-radius: 14px;   /* Sudut lebih bulat */
+    font-size: 16px;       
+    border-radius: 14px;   
     position: relative;
     z-index: 10;
 }
@@ -801,7 +800,9 @@ h3 {
 }
 
 .panel-actions {
-  margin-top: auto; /* Dorong tombol ke bawah panel */
-  padding-top: 16px;
+  margin-top: 20px;
   width: 100%;
+  max-width: 300px;
+  display: flex;
+  justify-content: center;
 }
