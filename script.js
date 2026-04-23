@@ -493,6 +493,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   renderSlots();
 
+  // Logika Drag & Drop Stiker DOM
   // Logika Drag, Resize & Rotate Stiker DOM
   let activeSticker = null;
   let isDragging = false,
@@ -1449,28 +1450,6 @@ document.addEventListener("DOMContentLoaded", () => {
               ctx.fillText(dateStr, canvas.width / 2, dateY);
               ctx.globalAlpha = 1.0; 
             }
-          }
-          
-
-            if (!footerText) {
-              if (currentTheme === "neko") footerText = "Purr-fect Memories 🐾";
-              if (currentTheme === "cafe") footerText = "Coffee & Memories ☕";
-              if (currentTheme === "polaroid")
-                footerText = "Captured Moments 📷";
-              if (currentTheme === "tropical") footerText = "Summer Vibes 🌴";
-              if (currentTheme === "galaxy") footerText = "Star Memories 🌌";
-              if (currentTheme === "pixel") footerText = "SCORE: 99999";
-              if (currentTheme === "watercolor")
-                footerText = "Art in Every Moment 🎨";
-              if (currentTheme === "vhs") footerText = "PLAY ▶ 1998";
-              if (currentTheme === "sakura") footerText = "桜の季節 🌸";
-              if (currentTheme === "wanted") footerText = "$1,000,000 REWARD";
-            }
-            ctx.fillText(
-              footerText,
-              canvas.width / 2,
-              canvas.height - paddingBottom / 2,
-            );
           }
 
           // Dekorasi Tema Tambahan
