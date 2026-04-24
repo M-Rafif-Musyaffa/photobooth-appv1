@@ -41,7 +41,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // 1. ELEMEN DOM & STATE APLIKASI
   // ==========================================
   const video = document.getElementById("camera-stream");
-  const arCanvas = document.getElementById("ar-overlay"); // Canvas AR Live
+  const arCanvas = document.getElementById("ar-overlay");
+  const bgOverlayCanvas = document.getElementById("bg-overlay");
+  const bgOverlayCtx = bgOverlayCanvas.getContext("2d");
   const arCtx = arCanvas.getContext("2d");
   const captureBtn = document.getElementById("capture-btn");
   const gallery = document.getElementById("photo-gallery");
@@ -324,7 +326,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
           arCtx.restore();
         } else if (currentAR === "bunny") {
-          // --- 🐰 FILTER BUNNY CUTE (KELINCI) ---
           const nose = landmarks[1]; // Titik ujung hidung
 
           arCtx.save();
@@ -478,7 +479,6 @@ document.addEventListener("DOMContentLoaded", () => {
   // 5. GENERATE SLOT & DRAGGABLE STICKER
   // ==========================================
 
-  // --- Fungsi helper warna custom (didefinisikan lebih awal agar bisa dipakai renderSlots) ---
   function applyCustomBg() {
     if (customBgColor) {
       frameWorkspace.style.backgroundColor = customBgColor;
@@ -891,74 +891,54 @@ document.addEventListener("DOMContentLoaded", () => {
     selfieSegmentation.setOptions({ modelSelection: 1 }); // 1 = landscape model, lebih akurat
 
     selfieSegmentation.onResults((results) => {
-      if (!bgRemoveEnabled) return;
+  if (!bgRemoveEnabled) return;
 
-      const w = video.videoWidth;
-      const h = video.videoHeight;
+  const w = video.videoWidth;
+  const h = video.videoHeight;
 
-      // Pastikan ukuran semua canvas sama
-      bgCanvas.width  = w;
-      bgCanvas.height = h;
-      arCanvas.width  = w;
-      arCanvas.height = h;
+  bgOverlayCanvas.width = w;
+  bgOverlayCanvas.height = h;
+  bgCanvas.width = w;
+  bgCanvas.height = h;
 
-      // --- Langkah 1: Ambil frame video (sudah di-mirror di CSS via scaleX(-1) pada video) ---
-      // Kita gambar video mentah (belum mirror) ke bgCanvas untuk pixel picking
-      bgCtx.clearRect(0, 0, w, h);
-      bgCtx.drawImage(results.image, 0, 0, w, h); // image dari mediapipe = frame asli (tidak mirror)
-      const frameData = bgCtx.getImageData(0, 0, w, h);
+  // 1. Gambar Background Pengganti ke bgOverlayCanvas
+  bgOverlayCtx.clearRect(0, 0, w, h);
+  if (bgReplaceType === "color") {
+    bgOverlayCtx.fillStyle = bgSolidColor;
+    bgOverlayCtx.fillRect(0, 0, w, h);
+  } else if (bgReplaceType === "gradient") {
+    const grad = bgOverlayCtx.createLinearGradient(0, 0, w, h);
+    grad.addColorStop(0, bgGradient1);
+    grad.addColorStop(1, bgGradient2);
+    bgOverlayCtx.fillStyle = grad;
+    bgOverlayCtx.fillRect(0, 0, w, h);
+  } else if (bgReplaceType === "blur") {
+    bgOverlayCtx.filter = "blur(18px)";
+    bgOverlayCtx.drawImage(results.image, 0, 0, w, h);
+    bgOverlayCtx.filter = "none";
+  }
 
-      // --- Langkah 2: Baca mask segmentasi ---
-      bgCtx.clearRect(0, 0, w, h);
-      bgCtx.drawImage(results.segmentationMask, 0, 0, w, h);
-      const maskData = bgCtx.getImageData(0, 0, w, h);
+  // 2. Ekstrak Orang Tanpa Background (Menggunakan GPU / Composite - Bebas Lag!)
+  bgCtx.clearRect(0, 0, w, h);
+  bgCtx.drawImage(results.segmentationMask, 0, 0, w, h); 
+  bgCtx.globalCompositeOperation = "source-in"; 
+  bgCtx.drawImage(results.image, 0, 0, w, h); 
+  bgCtx.globalCompositeOperation = "source-over"; 
 
-      // --- Langkah 3: Buat output pixel - orang transparan, bg transparan ---
-      const output = new ImageData(w, h);
-      for (let i = 0; i < maskData.data.length; i += 4) {
-        const alpha = maskData.data[i]; // channel merah = nilai mask (255=orang, 0=bg)
-        output.data[i]     = frameData.data[i];
-        output.data[i + 1] = frameData.data[i + 1];
-        output.data[i + 2] = frameData.data[i + 2];
-        output.data[i + 3] = alpha;
-      }
+  // 3. Gabungkan Orang ke Atas Background
+  bgOverlayCtx.drawImage(bgCanvas, 0, 0, w, h);
 
-      // --- Langkah 4: Render ke arCanvas ---
-      arCtx.clearRect(0, 0, w, h);
+  // 4. Mirror Hasil Akhir (Karena posisi kamera di-mirror)
+  bgCtx.clearRect(0, 0, w, h);
+  bgCtx.save();
+  bgCtx.translate(w, 0);
+  bgCtx.scale(-1, 1);
+  bgCtx.drawImage(bgOverlayCanvas, 0, 0);
+  bgCtx.restore();
 
-      // 4a. Gambar background pengganti (tanpa mirror)
-      if (bgReplaceType === "color") {
-        arCtx.fillStyle = bgSolidColor;
-        arCtx.fillRect(0, 0, w, h);
-      } else if (bgReplaceType === "gradient") {
-        const grad = arCtx.createLinearGradient(0, 0, w, h);
-        grad.addColorStop(0, bgGradient1);
-        grad.addColorStop(1, bgGradient2);
-        arCtx.fillStyle = grad;
-        arCtx.fillRect(0, 0, w, h);
-      } else if (bgReplaceType === "blur") {
-        arCtx.filter = "blur(18px)";
-        arCtx.drawImage(results.image, 0, 0, w, h);
-        arCtx.filter = "none";
-      }
-      // transparent: biarkan kosong (checkerboard dari CSS)
-
-      // 4b. Gambar orang (dengan alpha mask) di atas background
-      bgCtx.clearRect(0, 0, w, h);
-      bgCtx.putImageData(output, 0, 0);
-      arCtx.drawImage(bgCanvas, 0, 0);
-
-      // 4c. Mirror seluruh arCanvas (sama seperti video yang di-mirror CSS)
-      // Gunakan teknik: copy ke temp, flip, paste balik
-      bgCtx.clearRect(0, 0, w, h);
-      bgCtx.save();
-      bgCtx.translate(w, 0);
-      bgCtx.scale(-1, 1);
-      bgCtx.drawImage(arCanvas, 0, 0);
-      bgCtx.restore();
-      arCtx.clearRect(0, 0, w, h);
-      arCtx.drawImage(bgCanvas, 0, 0);
-    });
+  bgOverlayCtx.clearRect(0, 0, w, h);
+  bgOverlayCtx.drawImage(bgCanvas, 0, 0);
+});
 
     // Inisiasi pertama dengan mengirim frame awal
     const tempSend = async () => {
@@ -1005,15 +985,23 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Pilih tipe background pengganti
-  document.querySelectorAll(".bg-type-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".bg-type-btn").forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      bgReplaceType = btn.dataset.type;
-      document.getElementById("bg-color-row").style.display    = bgReplaceType === "color"    ? "block" : "none";
-      document.getElementById("bg-gradient-row").style.display = bgReplaceType === "gradient" ? "block" : "none";
-    });
-  });
+  document.getElementById("bg-remove-toggle").addEventListener("change", (e) => {
+  bgRemoveEnabled = e.target.checked;
+  const optionsEl = document.getElementById("bg-replace-options");
+  const videoWrapper = document.querySelector(".video-wrapper");
+
+  if (bgRemoveEnabled) {
+    optionsEl.style.display = "flex";
+    videoWrapper.classList.add("bg-active");
+    initSelfieSegmentation();
+  } else {
+    optionsEl.style.display = "none";
+    videoWrapper.classList.remove("bg-active");
+    // Hapus sisa render
+    bgOverlayCtx.clearRect(0, 0, bgOverlayCanvas.width, bgOverlayCanvas.height);
+    setStatus("");
+  }
+});
 
   // Preset warna solid
   document.querySelectorAll(".bg-solid-preset").forEach((btn) => {
