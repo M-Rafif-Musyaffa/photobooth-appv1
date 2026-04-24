@@ -9,7 +9,27 @@
     <link rel="stylesheet" href="style.css" />
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
+    <script>
+      (function() {
+        function loadScript(src, cb) {
+          const s = document.createElement("script");
+          s.src = src;
+          s.crossOrigin = "anonymous";
+          s.onload = cb;
+          s.onerror = function() { console.warn("Gagal load:", src); cb && cb(); };
+          document.head.appendChild(s);
+        }
+        loadScript(
+          "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js",
+          function() {
+            loadScript(
+              "https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.1/dist/body-pix.min.js",
+              function() { console.log("BodyPix siap."); }
+            );
+          }
+        );
+      })();
+    </script>
   </head>
   <body>
 
@@ -257,32 +277,21 @@
           <div class="menu-group">
             <div class="step-label">
               <span class="step-num">9</span>
-              <span>Background Removal (AI) 🪄</span>
+              <span>Hapus Background (AI) ✂</span>
             </div>
+            <p class="hint-text">
+              Jepret foto dulu → di galeri klik tombol <b>✂ Hapus BG</b> di bawah foto → background otomatis dihapus oleh AI.
+            </p>
 
-            <!-- Toggle ON/OFF -->
-            <div class="bg-remove-toggle-row">
-              <span class="bg-remove-label">Hapus Background</span>
-              <label class="toggle-switch">
-                <input type="checkbox" id="bg-remove-toggle" />
-                <span class="toggle-slider"></span>
-              </label>
-            </div>
-
-            <!-- Pilihan Background Pengganti -->
-            <div id="bg-replace-options" class="bg-replace-options" style="display:none;">
-              <div class="export-section-label" style="margin-top:8px;">Ganti dengan:</div>
-
-              <!-- Warna solid -->
+            <div class="bg-replace-options" style="display:flex; flex-direction:column; gap:6px;">
+              <div class="export-section-label">Background pengganti:</div>
               <div class="pill-selector" id="bg-replace-type">
                 <button class="bg-type-btn active" data-type="transparent">⬜ Transparan</button>
                 <button class="bg-type-btn" data-type="color">🎨 Warna</button>
                 <button class="bg-type-btn" data-type="gradient">🌈 Gradien</button>
-                <button class="bg-type-btn" data-type="blur">💨 Blur</button>
               </div>
 
-              <!-- Color picker (muncul jika mode warna) -->
-              <div id="bg-color-row" class="color-row" style="margin-top:8px; display:none;">
+              <div id="bg-color-row" class="color-row" style="display:none;">
                 <div class="color-presets">
                   <button class="color-preset bg-solid-preset active" data-color="#ffffff" style="background:#ffffff;border:2px solid #ccc;"></button>
                   <button class="color-preset bg-solid-preset" data-color="#000000" style="background:#000000;"></button>
@@ -295,8 +304,7 @@
                 </div>
               </div>
 
-              <!-- Gradient picker (muncul jika mode gradien) -->
-              <div id="bg-gradient-row" class="color-row" style="margin-top:8px; display:none;">
+              <div id="bg-gradient-row" class="color-row" style="display:none;">
                 <div class="gradient-presets" id="gradient-presets">
                   <button class="gradient-preset active" data-g1="#ff9a9e" data-g2="#fecfef" style="background:linear-gradient(135deg,#ff9a9e,#fecfef);" title="Rose"></button>
                   <button class="gradient-preset" data-g1="#a18cd1" data-g2="#fbc2eb" style="background:linear-gradient(135deg,#a18cd1,#fbc2eb);" title="Lavender"></button>
@@ -308,10 +316,9 @@
                   <button class="gradient-preset" data-g1="#ee0979" data-g2="#ff6a00" style="background:linear-gradient(135deg,#ee0979,#ff6a00);" title="Flame"></button>
                 </div>
               </div>
-
-              <!-- Status loading -->
-              <div id="bg-remove-status" class="bg-remove-status"></div>
             </div>
+
+            <div id="bg-remove-status" class="bg-remove-status" style="margin-top:8px;"></div>
           </div>
 
         </div><!-- /sidebar-scroll -->
@@ -337,7 +344,7 @@
             </div>
 
             <div class="gallery-section">
-              <h3>Foto tersimpan — klik untuk pasang ke bingkai</h3>
+              <h3>Foto tersimpan — klik foto untuk pilih, ✂ untuk hapus BG</h3>
               <div id="photo-gallery" class="gallery"></div>
             </div>
 

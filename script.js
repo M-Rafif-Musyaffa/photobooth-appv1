@@ -1,7 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
-  // ==========================================
   // 1.1 LOGIKA MENU MOBILE (Slide & Overlay)
-  // ==========================================
   const menuToggle = document.getElementById("menu-toggle");
   const sidebar = document.querySelector(".cute-navbar");
   const overlay = document.getElementById("menu-overlay");
@@ -75,16 +73,11 @@ document.addEventListener("DOMContentLoaded", () => {
   let customBorderColor = "#ffffff";
   let currentBorderStyle = "none"; // none, thin, thick, polaroid, rounded, shadow
 
-  // State Background Removal
-  let bgRemoveEnabled = false;
+  // State Background Removal (per-foto dengan BodyPix)
   let bgReplaceType = "transparent";
   let bgSolidColor = "#ffffff";
   let bgGradient1 = "#ff9a9e";
   let bgGradient2 = "#fecfef";
-  let selfieSegmentation = null;
-  let segmentationReady = false;
-  const bgCanvas = document.createElement("canvas");
-  const bgCtx = bgCanvas.getContext("2d", { willReadFrequently: true });
 
   // ==========================================
   // 2. AUDIO FEEDBACK (Synthesizer Tanpa File)
@@ -869,140 +862,145 @@ document.addEventListener("DOMContentLoaded", () => {
     }),
   );
 
+
   // ==========================================
-  // BACKGROUND REMOVAL — Setup & Events
+  // BACKGROUND REMOVAL — BodyPix Per-Foto
   // ==========================================
-  function setStatus(msg, type = "") {
+  let bodyPixModel = null;
+  let bodyPixLoading = false;
+  let statusTimer = null;
+
+  function setStatus(msg, type = "", autohide = 0) {
     const el = document.getElementById("bg-remove-status");
+    if (!el) return;
     el.textContent = msg;
     el.className = "bg-remove-status " + type;
+    if (statusTimer) clearTimeout(statusTimer);
+    if (autohide > 0) {
+      statusTimer = setTimeout(() => {
+        el.textContent = "";
+        el.className = "bg-remove-status";
+      }, autohide);
+    }
   }
 
-  function initSelfieSegmentation() {
-    if (selfieSegmentation) return; // sudah init
+  async function loadBodyPix() {
+    if (bodyPixModel) return bodyPixModel;
+    // Tunggu kalau sedang loading
+    if (bodyPixLoading) {
+      return new Promise((resolve) => {
+        const check = setInterval(() => {
+          if (bodyPixModel) { clearInterval(check); resolve(bodyPixModel); }
+          if (!bodyPixLoading) { clearInterval(check); resolve(null); }
+        }, 200);
+      });
+    }
 
-    setStatus("⏳ Memuat model AI...", "loading");
+    bodyPixLoading = true;
+    setStatus("⏳ Memuat model AI (sekali saja)...", "loading");
 
-    selfieSegmentation = new SelfieSegmentation({
-      locateFile: (file) =>
-        `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`,
-    });
-
-    selfieSegmentation.setOptions({ modelSelection: 1 }); // 1 = landscape model, lebih akurat
-
-    selfieSegmentation.onResults((results) => {
-      if (!bgRemoveEnabled) return;
-
-      const w = video.videoWidth;
-      const h = video.videoHeight;
-
-      // Pastikan ukuran semua canvas sama
-      bgCanvas.width  = w;
-      bgCanvas.height = h;
-      arCanvas.width  = w;
-      arCanvas.height = h;
-
-      // --- Langkah 1: Ambil frame video (sudah di-mirror di CSS via scaleX(-1) pada video) ---
-      // Kita gambar video mentah (belum mirror) ke bgCanvas untuk pixel picking
-      bgCtx.clearRect(0, 0, w, h);
-      bgCtx.drawImage(results.image, 0, 0, w, h); // image dari mediapipe = frame asli (tidak mirror)
-      const frameData = bgCtx.getImageData(0, 0, w, h);
-
-      // --- Langkah 2: Baca mask segmentasi ---
-      bgCtx.clearRect(0, 0, w, h);
-      bgCtx.drawImage(results.segmentationMask, 0, 0, w, h);
-      const maskData = bgCtx.getImageData(0, 0, w, h);
-
-      // --- Langkah 3: Buat output pixel - orang transparan, bg transparan ---
-      const output = new ImageData(w, h);
-      for (let i = 0; i < maskData.data.length; i += 4) {
-        const alpha = maskData.data[i]; // channel merah = nilai mask (255=orang, 0=bg)
-        output.data[i]     = frameData.data[i];
-        output.data[i + 1] = frameData.data[i + 1];
-        output.data[i + 2] = frameData.data[i + 2];
-        output.data[i + 3] = alpha;
+    try {
+      // Pastikan tf dan bodyPix tersedia
+      if (typeof bodyPix === "undefined") {
+        throw new Error("Library BodyPix belum tersedia");
       }
+      bodyPixModel = await bodyPix.load({
+        architecture: "MobileNetV1",
+        outputStride: 16,
+        multiplier: 0.75,
+        quantBytes: 2,
+      });
+      bodyPixLoading = false;
+      setStatus("✅ Model siap!", "ready", 3000);
+      return bodyPixModel;
+    } catch (e) {
+      console.error("BodyPix load error:", e);
+      bodyPixLoading = false;
+      bodyPixModel = null;
+      setStatus("❌ Gagal memuat model. Cek koneksi internet.", "error", 4000);
+      return null;
+    }
+  }
 
-      // --- Langkah 4: Render ke arCanvas ---
-      arCtx.clearRect(0, 0, w, h);
+  async function removeBackground(imgEl, galleryItem) {
+    // Tampilkan loading state di tombol
+    const btn = galleryItem.querySelector(".bg-remove-btn");
+    if (btn) { btn.textContent = "⏳"; btn.disabled = true; }
 
-      // 4a. Gambar background pengganti (tanpa mirror)
+    const model = await loadBodyPix();
+    if (!model) {
+      if (btn) { btn.textContent = "✂"; btn.disabled = false; }
+      return;
+    }
+
+    // Gambar foto ke canvas sementara
+    const tmpCanvas = document.createElement("canvas");
+    tmpCanvas.width  = imgEl.naturalWidth  || imgEl.width;
+    tmpCanvas.height = imgEl.naturalHeight || imgEl.height;
+    const tmpCtx = tmpCanvas.getContext("2d");
+    tmpCtx.drawImage(imgEl, 0, 0);
+
+    try {
+      // Segmentasi orang
+      const segmentation = await model.segmentPerson(tmpCanvas, {
+        flipHorizontal: false,
+        internalResolution: "medium",
+        segmentationThreshold: 0.7,
+      });
+
+      const { width: w, height: h } = tmpCanvas;
+      const imageData = tmpCtx.getImageData(0, 0, w, h);
+
+      // Terapkan background pengganti
+      const outCanvas = document.createElement("canvas");
+      outCanvas.width  = w;
+      outCanvas.height = h;
+      const outCtx = outCanvas.getContext("2d");
+
       if (bgReplaceType === "color") {
-        arCtx.fillStyle = bgSolidColor;
-        arCtx.fillRect(0, 0, w, h);
+        outCtx.fillStyle = bgSolidColor;
+        outCtx.fillRect(0, 0, w, h);
       } else if (bgReplaceType === "gradient") {
-        const grad = arCtx.createLinearGradient(0, 0, w, h);
+        const grad = outCtx.createLinearGradient(0, 0, w, h);
         grad.addColorStop(0, bgGradient1);
         grad.addColorStop(1, bgGradient2);
-        arCtx.fillStyle = grad;
-        arCtx.fillRect(0, 0, w, h);
-      } else if (bgReplaceType === "blur") {
-        arCtx.filter = "blur(18px)";
-        arCtx.drawImage(results.image, 0, 0, w, h);
-        arCtx.filter = "none";
+        outCtx.fillStyle = grad;
+        outCtx.fillRect(0, 0, w, h);
       }
-      // transparent: biarkan kosong (checkerboard dari CSS)
+      // transparent: biarkan kosong
 
-      // 4b. Gambar orang (dengan alpha mask) di atas background
-      bgCtx.clearRect(0, 0, w, h);
-      bgCtx.putImageData(output, 0, 0);
-      arCtx.drawImage(bgCanvas, 0, 0);
-
-      // 4c. Mirror seluruh arCanvas (sama seperti video yang di-mirror CSS)
-      // Gunakan teknik: copy ke temp, flip, paste balik
-      bgCtx.clearRect(0, 0, w, h);
-      bgCtx.save();
-      bgCtx.translate(w, 0);
-      bgCtx.scale(-1, 1);
-      bgCtx.drawImage(arCanvas, 0, 0);
-      bgCtx.restore();
-      arCtx.clearRect(0, 0, w, h);
-      arCtx.drawImage(bgCanvas, 0, 0);
-    });
-
-    // Inisiasi pertama dengan mengirim frame awal
-    const tempSend = async () => {
-      try {
-        await selfieSegmentation.send({ image: video });
-        segmentationReady = true;
-        setStatus("✅ Siap! Background dihapus.", "ready");
-      } catch {
-        setStatus("❌ Gagal memuat model.", "error");
+      // Terapkan mask — hanya pixel orang yang digambar
+      const outputData = outCtx.getImageData(0, 0, w, h);
+      for (let i = 0; i < segmentation.data.length; i++) {
+        if (segmentation.data[i] === 1) {
+          // Pixel ini adalah orang — salin dari foto asli
+          outputData.data[i * 4]     = imageData.data[i * 4];
+          outputData.data[i * 4 + 1] = imageData.data[i * 4 + 1];
+          outputData.data[i * 4 + 2] = imageData.data[i * 4 + 2];
+          outputData.data[i * 4 + 3] = 255;
+        }
+        // else: biarkan pixel background (transparent atau warna yg sudah digambar)
       }
-    };
-    video.addEventListener("loadeddata", tempSend, { once: true });
-    if (video.readyState >= 2) tempSend();
-  }
+      outCtx.putImageData(outputData, 0, 0);
 
-  // Loop segmentasi — dijalankan bersamaan dengan faceMesh loop
-  async function segmentFrame() {
-    if (bgRemoveEnabled && selfieSegmentation && segmentationReady) {
-      try {
-        await selfieSegmentation.send({ image: video });
-      } catch { /* skip frame error */ }
+      // Update gallery item dengan foto hasil
+      const mimeType = bgReplaceType === "transparent" ? "image/png" : "image/jpeg";
+      const newSrc = outCanvas.toDataURL(mimeType, 0.92);
+      imgEl.src = newSrc;
+
+      // Update selectedImageSrc jika foto ini yang aktif dipilih
+      if (galleryItem.classList.contains("selected")) {
+        selectedImageSrc = newSrc;
+      }
+
+      if (btn) { btn.textContent = "✅"; btn.disabled = false; }
+      setStatus("✅ Background berhasil dihapus!", "ready");
+
+    } catch (e) {
+      setStatus("❌ Gagal proses foto.", "error");
+      if (btn) { btn.textContent = "✂"; btn.disabled = false; }
     }
-    requestAnimationFrame(segmentFrame);
   }
-  segmentFrame();
-
-  // Toggle ON/OFF
-  document.getElementById("bg-remove-toggle").addEventListener("change", (e) => {
-    bgRemoveEnabled = e.target.checked;
-    const optionsEl = document.getElementById("bg-replace-options");
-    const videoWrapper = document.querySelector(".video-wrapper");
-
-    if (bgRemoveEnabled) {
-      optionsEl.style.display = "flex";
-      videoWrapper.classList.add("bg-active");
-      initSelfieSegmentation();
-    } else {
-      optionsEl.style.display = "none";
-      videoWrapper.classList.remove("bg-active");
-      // Bersihkan arCanvas dari compositing bg removal (biarkan AR filter tetap jalan)
-      arCtx.clearRect(0, 0, arCanvas.width, arCanvas.height);
-      setStatus("");
-    }
-  });
 
   // Pilih tipe background pengganti
   document.querySelectorAll(".bg-type-btn").forEach((btn) => {
@@ -1038,6 +1036,7 @@ document.addEventListener("DOMContentLoaded", () => {
       bgGradient2 = btn.dataset.g2;
     });
   });
+
 
   // ==========================================
   // FITUR BARU: TEMA WARNA CUSTOM — Event Listeners
@@ -1150,58 +1149,46 @@ document.addEventListener("DOMContentLoaded", () => {
     ctx.translate(canvas.width, 0);
     ctx.scale(-1, 1);
 
-    if (bgRemoveEnabled && segmentationReady) {
-      // arCanvas sudah berisi compositing yang sudah di-mirror
-      // Gambar langsung ke canvas output tanpa flip tambahan
-      ctx.restore(); // batalkan transform mirror
-      ctx.save();
-
-      // Background pengganti
-      if (bgReplaceType === "color") {
-        ctx.fillStyle = bgSolidColor;
-        ctx.fillRect(0, 0, drawW, drawH);
-      } else if (bgReplaceType === "gradient") {
-        const grad = ctx.createLinearGradient(0, 0, drawW, drawH);
-        grad.addColorStop(0, bgGradient1);
-        grad.addColorStop(1, bgGradient2);
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, drawW, drawH);
-      } else if (bgReplaceType === "blur") {
-        // blur dari video asli, lalu mirror
-        ctx.save();
-        ctx.translate(drawW, 0);
-        ctx.scale(-1, 1);
-        ctx.filter = "blur(18px)";
-        ctx.drawImage(video, startX, startY, drawW, drawH, 0, 0, drawW, drawH);
-        ctx.filter = "none";
-        ctx.restore();
-      }
-
-      // Gambar arCanvas (orang+bg yang sudah di-composit dan di-mirror)
+    // Render video + filter
+    ctx.filter = currentFilter;
+    ctx.drawImage(video, startX, startY, drawW, drawH, 0, 0, drawW, drawH);
+    ctx.filter = "none";
+    // AR overlay
+    if (currentAR !== "none") {
       ctx.drawImage(arCanvas, startX, startY, drawW, drawH, 0, 0, drawW, drawH);
-      ctx.restore();
-    } else {
-      // Normal: gambar video + filter
-      ctx.filter = currentFilter;
-      ctx.drawImage(video, startX, startY, drawW, drawH, 0, 0, drawW, drawH);
-      ctx.filter = "none";
-      // AR overlay (neko/glasses/bunny)
-      if (currentAR !== "none") {
-        ctx.drawImage(arCanvas, startX, startY, drawW, drawH, 0, 0, drawW, drawH);
-      }
     }
     ctx.restore();
 
     const imgUrl = canvas.toDataURL("image/jpeg", 0.9);
+
+    // Buat wrapper gallery item
+    const itemWrap = document.createElement("div");
+    itemWrap.className = "gallery-item-wrap";
+
     const imgEl = document.createElement("img");
     imgEl.src = imgUrl;
     imgEl.classList.add("gallery-item");
+
+    // Klik foto = pilih (tanpa hapus BG)
     imgEl.addEventListener("click", () => {
-      document.querySelectorAll(".gallery-item").forEach((el) => el.classList.remove("selected"));
-      imgEl.classList.add("selected");
-      selectedImageSrc = imgUrl;
+      document.querySelectorAll(".gallery-item-wrap").forEach((el) => el.classList.remove("selected"));
+      itemWrap.classList.add("selected");
+      selectedImageSrc = imgEl.src; // selalu pakai src terbaru (bisa sudah di-remove BG)
     });
-    gallery.prepend(imgEl);
+
+    // Tombol ✂ hapus background — opsional, tidak wajib
+    const bgBtn = document.createElement("button");
+    bgBtn.className = "bg-remove-btn";
+    bgBtn.textContent = "✂ BG";
+    bgBtn.title = "Hapus Background (AI) — opsional";
+    bgBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      removeBackground(imgEl, itemWrap);
+    });
+
+    itemWrap.appendChild(imgEl);
+    itemWrap.appendChild(bgBtn);
+    gallery.prepend(itemWrap);
   }
 
   // ==========================================
