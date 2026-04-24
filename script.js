@@ -896,48 +896,64 @@ const bgOverlayCtx = bgOverlayCanvas.getContext("2d", { willReadFrequently: true
   const w = video.videoWidth;
   const h = video.videoHeight;
 
+  // Samakan ukuran semua canvas
   bgOverlayCanvas.width = w;
   bgOverlayCanvas.height = h;
   bgCanvas.width = w;
   bgCanvas.height = h;
 
-  // 1. Gambar Background Pengganti ke bgOverlayCanvas
-  bgOverlayCtx.clearRect(0, 0, w, h);
+  const ctx = bgOverlayCtx;
+
+  // --- 1. Ambil Pixel Kamera & Mask dari AI ---
+  bgCtx.drawImage(results.image, 0, 0, w, h);
+  const frameData = bgCtx.getImageData(0, 0, w, h);
+  const frame32 = new Uint32Array(frameData.data.buffer); // Proses 32-bit (Super Cepat!)
+
+  bgCtx.drawImage(results.segmentationMask, 0, 0, w, h);
+  const maskData = bgCtx.getImageData(0, 0, w, h);
+
+  // --- 2. Siapkan Background Pengganti ---
+  ctx.clearRect(0, 0, w, h);
   if (bgReplaceType === "color") {
-    bgOverlayCtx.fillStyle = bgSolidColor;
-    bgOverlayCtx.fillRect(0, 0, w, h);
+    ctx.fillStyle = bgSolidColor;
+    ctx.fillRect(0, 0, w, h);
   } else if (bgReplaceType === "gradient") {
-    const grad = bgOverlayCtx.createLinearGradient(0, 0, w, h);
+    const grad = ctx.createLinearGradient(0, 0, w, h);
     grad.addColorStop(0, bgGradient1);
     grad.addColorStop(1, bgGradient2);
-    bgOverlayCtx.fillStyle = grad;
-    bgOverlayCtx.fillRect(0, 0, w, h);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
   } else if (bgReplaceType === "blur") {
-    bgOverlayCtx.filter = "blur(18px)";
-    bgOverlayCtx.drawImage(results.image, 0, 0, w, h);
-    bgOverlayCtx.filter = "none";
+    ctx.filter = "blur(18px)";
+    ctx.drawImage(results.image, 0, 0, w, h);
+    ctx.filter = "none";
   }
 
-  // 2. Ekstrak Orang Tanpa Background (Menggunakan GPU / Composite - Bebas Lag!)
-  bgCtx.clearRect(0, 0, w, h);
-  bgCtx.drawImage(results.segmentationMask, 0, 0, w, h); 
-  bgCtx.globalCompositeOperation = "source-in"; 
-  bgCtx.drawImage(results.image, 0, 0, w, h); 
-  bgCtx.globalCompositeOperation = "source-over"; 
+  // Ambil pixel dari background pengganti
+  const outData = ctx.getImageData(0, 0, w, h);
+  const out32 = new Uint32Array(outData.data.buffer);
 
-  // 3. Gabungkan Orang ke Atas Background
-  bgOverlayCtx.drawImage(bgCanvas, 0, 0, w, h);
+  // --- 3. Gabungkan Orang & Background (Metode Anti-Lag) ---
+  for (let i = 0; i < frame32.length; i++) {
+    // Membaca channel merah dari maskData (0 = Background, 255 = Orang)
+    if (maskData.data[i * 4] > 128) { 
+      out32[i] = frame32[i]; // Potong tubuh orang dan timpa ke atas background!
+    }
+  }
 
-  // 4. Mirror Hasil Akhir (Karena posisi kamera di-mirror)
+  // Kembalikan gambar gabungan ke canvas layar
+  ctx.putImageData(outData, 0, 0);
+
+  // --- 4. Mirror Gambar Agar Seperti Cermin ---
   bgCtx.clearRect(0, 0, w, h);
   bgCtx.save();
   bgCtx.translate(w, 0);
   bgCtx.scale(-1, 1);
-  bgCtx.drawImage(bgOverlayCanvas, 0, 0);
+  bgCtx.drawImage(bgOverlayCanvas, 0, 0, w, h);
   bgCtx.restore();
 
-  bgOverlayCtx.clearRect(0, 0, w, h);
-  bgOverlayCtx.drawImage(bgCanvas, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  ctx.drawImage(bgCanvas, 0, 0, w, h);
 });
 
     // Inisiasi pertama dengan mengirim frame awal
@@ -1139,19 +1155,19 @@ const bgOverlayCtx = bgOverlayCanvas.getContext("2d", { willReadFrequently: true
     ctx.scale(-1, 1);
 
     if (bgRemoveEnabled && segmentationReady) {
+      // Lepas mirror karena bgOverlayCanvas sudah di-mirror oleh script AI di atas
       ctx.restore(); 
       ctx.save();
       
-      // Gambar hasil background removal
+      // Gambar background hasil AI ke canvas cetak
       ctx.drawImage(bgOverlayCanvas, startX, startY, drawW, drawH, 0, 0, drawW, drawH);
       
-      // Kembalikan transformasi mirror untuk AR
+      // Kembalikan ke mode mirror khusus untuk stiker kacamata/telinga kucing
       ctx.restore();
       ctx.save();
       ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
       
-      // Jika filter kacamata/telinga sedang aktif, tiban di atas background
       if (currentAR !== "none") {
         ctx.drawImage(arCanvas, startX, startY, drawW, drawH, 0, 0, drawW, drawH);
       }
