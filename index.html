@@ -9,27 +9,7 @@
     <link rel="stylesheet" href="style.css" />
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
-    <script>
-      (function() {
-        function loadScript(src, cb) {
-          const s = document.createElement("script");
-          s.src = src;
-          s.crossOrigin = "anonymous";
-          s.onload = cb;
-          s.onerror = function() { console.warn("Gagal load:", src); cb && cb(); };
-          document.head.appendChild(s);
-        }
-        loadScript(
-          "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js",
-          function() {
-            loadScript(
-              "https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.1/dist/body-pix.min.js",
-              function() { console.log("BodyPix siap."); }
-            );
-          }
-        );
-      })();
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1/selfie_segmentation.js" crossorigin="anonymous"></script>
   </head>
   <body>
 
@@ -76,6 +56,49 @@
               <button class="count-btn active" data-value="3">3</button>
               <button class="count-btn" data-value="4">4</button>
               <button class="count-btn" data-value="5">5</button>
+            </div>
+          </div>
+
+          <!-- 2b. Timer & Burst -->
+          <div class="menu-group">
+            <div class="step-label">
+              <span class="step-num">⏱</span>
+              <span>Timer & Mode Jepret</span>
+            </div>
+
+            <!-- Timer Countdown -->
+            <div class="timer-row">
+              <label class="timer-sublabel">⏳ Delay Countdown</label>
+              <div class="pill-selector" id="timer-selector">
+                <button class="timer-btn" data-value="0">Instan</button>
+                <button class="timer-btn active" data-value="3">3 dtk</button>
+                <button class="timer-btn" data-value="5">5 dtk</button>
+                <button class="timer-btn" data-value="10">10 dtk</button>
+              </div>
+            </div>
+
+            <!-- Burst Mode -->
+            <div class="burst-row">
+              <label class="timer-sublabel">⚡ Burst Mode</label>
+              <p class="burst-hint">Jepret semua slot otomatis tanpa klik berulang</p>
+              <div class="burst-controls">
+                <div class="pill-selector" id="burst-gap-selector">
+                  <button class="burst-gap-btn active" data-value="2000">2 dtk</button>
+                  <button class="burst-gap-btn" data-value="3000">3 dtk</button>
+                  <button class="burst-gap-btn" data-value="5000">5 dtk</button>
+                </div>
+                <p class="burst-gap-label">Jeda antar foto</p>
+              </div>
+              <button id="burst-btn" class="btn-burst">
+                <span class="burst-icon">⚡</span>
+                <span id="burst-btn-label">Mulai Burst</span>
+              </button>
+              <div id="burst-progress" class="burst-progress" style="display:none;">
+                <div class="burst-progress-bar">
+                  <div id="burst-progress-fill" class="burst-progress-fill"></div>
+                </div>
+                <p id="burst-progress-text" class="burst-progress-text">Foto 1 dari 3…</p>
+              </div>
             </div>
           </div>
 

@@ -1,5 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
+  // ==========================================
   // 1.1 LOGIKA MENU MOBILE (Slide & Overlay)
+  // ==========================================
   const menuToggle = document.getElementById("menu-toggle");
   const sidebar = document.querySelector(".cute-navbar");
   const overlay = document.getElementById("menu-overlay");
@@ -67,6 +69,9 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentAR = "none";
   let slotData = [];
   let isCountingDown = false;
+  let countdownSeconds = 3;   // Delay timer pilihan user
+  let burstGapMs = 2000;      // Jeda antar foto di burst mode
+  let isBurstRunning = false; // Flag burst sedang berjalan
 
   // State Fitur Baru
   let customBgColor = null;       // null = ikuti tema
@@ -866,8 +871,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // ==========================================
   // BACKGROUND REMOVAL — BodyPix Per-Foto
   // ==========================================
-  let bodyPixModel = null;
-  let bodyPixLoading = false;
+  let segmentModel = null;
+  let segmentModelLoading = false;
   let statusTimer = null;
 
   function setStatus(msg, type = "", autohide = 0) {
@@ -884,77 +889,95 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  async function loadBodyPix() {
-    if (bodyPixModel) return bodyPixModel;
-    // Tunggu kalau sedang loading
-    if (bodyPixLoading) {
-      return new Promise((resolve) => {
+  function initSegmentModel() {
+    return new Promise((resolve) => {
+      if (segmentModel) return resolve(segmentModel);
+      if (segmentModelLoading) {
         const check = setInterval(() => {
-          if (bodyPixModel) { clearInterval(check); resolve(bodyPixModel); }
-          if (!bodyPixLoading) { clearInterval(check); resolve(null); }
-        }, 200);
-      });
-    }
-
-    bodyPixLoading = true;
-    setStatus("⏳ Memuat model AI (sekali saja)...", "loading");
-
-    try {
-      // Pastikan tf dan bodyPix tersedia
-      if (typeof bodyPix === "undefined") {
-        throw new Error("Library BodyPix belum tersedia");
+          if (segmentModel) { clearInterval(check); resolve(segmentModel); }
+        }, 300);
+        return;
       }
-      bodyPixModel = await bodyPix.load({
-        architecture: "MobileNetV1",
-        outputStride: 16,
-        multiplier: 0.75,
-        quantBytes: 2,
-      });
-      bodyPixLoading = false;
-      setStatus("✅ Model siap!", "ready", 3000);
-      return bodyPixModel;
-    } catch (e) {
-      console.error("BodyPix load error:", e);
-      bodyPixLoading = false;
-      bodyPixModel = null;
-      setStatus("❌ Gagal memuat model. Cek koneksi internet.", "error", 4000);
-      return null;
-    }
+      segmentModelLoading = true;
+      setStatus("⏳ Memuat model AI...", "loading");
+      try {
+        const model = new SelfieSegmentation({
+          locateFile: (f) =>
+            `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1/${f}`,
+        });
+        model.setOptions({ modelSelection: 1 });
+        model.onResults((results) => {
+          if (model._resolvePhoto) model._resolvePhoto(results);
+        });
+        const warmup = () => {
+          model.send({ image: video })
+            .then(() => {
+              segmentModel = model;
+              segmentModelLoading = false;
+              setStatus("✅ Model siap!", "ready", 3000);
+              resolve(segmentModel);
+            })
+            .catch((e) => {
+              console.error("Warmup error:", e);
+              segmentModelLoading = false;
+              setStatus("❌ Gagal load model.", "error", 4000);
+              resolve(null);
+            });
+        };
+        if (video.readyState >= 2) warmup();
+        else video.addEventListener("loadeddata", warmup, { once: true });
+      } catch (e) {
+        console.error(e);
+        segmentModelLoading = false;
+        setStatus("❌ SelfieSegmentation tidak tersedia.", "error", 4000);
+        resolve(null);
+      }
+    });
+  }
+
+  function segmentImage(imgEl) {
+    return new Promise(async (resolve, reject) => {
+      const model = await initSegmentModel();
+      if (!model) return reject(new Error("Model tidak tersedia"));
+      model._resolvePhoto = (results) => {
+        model._resolvePhoto = null;
+        resolve(results);
+      };
+      try {
+        await model.send({ image: imgEl });
+      } catch (e) {
+        model._resolvePhoto = null;
+        reject(e);
+      }
+    });
   }
 
   async function removeBackground(imgEl, galleryItem) {
-    // Tampilkan loading state di tombol
     const btn = galleryItem.querySelector(".bg-remove-btn");
     if (btn) { btn.textContent = "⏳"; btn.disabled = true; }
-
-    const model = await loadBodyPix();
-    if (!model) {
-      if (btn) { btn.textContent = "✂"; btn.disabled = false; }
-      return;
-    }
-
-    // Gambar foto ke canvas sementara
-    const tmpCanvas = document.createElement("canvas");
-    tmpCanvas.width  = imgEl.naturalWidth  || imgEl.width;
-    tmpCanvas.height = imgEl.naturalHeight || imgEl.height;
-    const tmpCtx = tmpCanvas.getContext("2d");
-    tmpCtx.drawImage(imgEl, 0, 0);
-
     try {
-      // Segmentasi orang
-      const segmentation = await model.segmentPerson(tmpCanvas, {
-        flipHorizontal: false,
-        internalResolution: "medium",
-        segmentationThreshold: 0.7,
-      });
+      setStatus("⏳ Memproses foto...", "loading");
+      const results = await segmentImage(imgEl);
+      const w = imgEl.naturalWidth  || imgEl.width;
+      const h = imgEl.naturalHeight || imgEl.height;
 
-      const { width: w, height: h } = tmpCanvas;
-      const imageData = tmpCtx.getImageData(0, 0, w, h);
+      // Canvas sumber
+      const srcCanvas = document.createElement("canvas");
+      srcCanvas.width = w; srcCanvas.height = h;
+      const srcCtx = srcCanvas.getContext("2d");
+      srcCtx.drawImage(imgEl, 0, 0, w, h);
+      const frameData = srcCtx.getImageData(0, 0, w, h);
 
-      // Terapkan background pengganti
+      // Canvas mask
+      const maskCanvas = document.createElement("canvas");
+      maskCanvas.width = w; maskCanvas.height = h;
+      const maskCtx = maskCanvas.getContext("2d");
+      maskCtx.drawImage(results.segmentationMask, 0, 0, w, h);
+      const maskData = maskCtx.getImageData(0, 0, w, h);
+
+      // Canvas output
       const outCanvas = document.createElement("canvas");
-      outCanvas.width  = w;
-      outCanvas.height = h;
+      outCanvas.width = w; outCanvas.height = h;
       const outCtx = outCanvas.getContext("2d");
 
       if (bgReplaceType === "color") {
@@ -967,38 +990,29 @@ document.addEventListener("DOMContentLoaded", () => {
         outCtx.fillStyle = grad;
         outCtx.fillRect(0, 0, w, h);
       }
-      // transparent: biarkan kosong
 
-      // Terapkan mask — hanya pixel orang yang digambar
-      const outputData = outCtx.getImageData(0, 0, w, h);
-      for (let i = 0; i < segmentation.data.length; i++) {
-        if (segmentation.data[i] === 1) {
-          // Pixel ini adalah orang — salin dari foto asli
-          outputData.data[i * 4]     = imageData.data[i * 4];
-          outputData.data[i * 4 + 1] = imageData.data[i * 4 + 1];
-          outputData.data[i * 4 + 2] = imageData.data[i * 4 + 2];
-          outputData.data[i * 4 + 3] = 255;
+      const outData = outCtx.getImageData(0, 0, w, h);
+      for (let i = 0; i < maskData.data.length; i += 4) {
+        if (maskData.data[i] > 128) {
+          outData.data[i]     = frameData.data[i];
+          outData.data[i + 1] = frameData.data[i + 1];
+          outData.data[i + 2] = frameData.data[i + 2];
+          outData.data[i + 3] = 255;
         }
-        // else: biarkan pixel background (transparent atau warna yg sudah digambar)
       }
-      outCtx.putImageData(outputData, 0, 0);
+      outCtx.putImageData(outData, 0, 0);
 
-      // Update gallery item dengan foto hasil
-      const mimeType = bgReplaceType === "transparent" ? "image/png" : "image/jpeg";
-      const newSrc = outCanvas.toDataURL(mimeType, 0.92);
+      const mime = bgReplaceType === "transparent" ? "image/png" : "image/jpeg";
+      const newSrc = outCanvas.toDataURL(mime, 0.92);
       imgEl.src = newSrc;
+      if (galleryItem.classList.contains("selected")) selectedImageSrc = newSrc;
 
-      // Update selectedImageSrc jika foto ini yang aktif dipilih
-      if (galleryItem.classList.contains("selected")) {
-        selectedImageSrc = newSrc;
-      }
-
-      if (btn) { btn.textContent = "✅"; btn.disabled = false; }
-      setStatus("✅ Background berhasil dihapus!", "ready");
-
+      if (btn) { btn.textContent = "✂ BG"; btn.disabled = false; }
+      setStatus("✅ Selesai!", "ready", 3000);
     } catch (e) {
-      setStatus("❌ Gagal proses foto.", "error");
-      if (btn) { btn.textContent = "✂"; btn.disabled = false; }
+      console.error("removeBackground error:", e);
+      if (btn) { btn.textContent = "✂ BG"; btn.disabled = false; }
+      setStatus("❌ Gagal proses foto.", "error", 4000);
     }
   }
 
@@ -1099,14 +1113,50 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // ==========================================
+  // TIMER SELECTOR
+  // ==========================================
+  document.querySelectorAll(".timer-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".timer-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      countdownSeconds = parseInt(btn.dataset.value);
+    });
+  });
+
+  // BURST GAP SELECTOR
+  document.querySelectorAll(".burst-gap-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".burst-gap-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      burstGapMs = parseInt(btn.dataset.value);
+    });
+  });
+
+  // ==========================================
   // 7. JEPRET FOTO & COUNTDOWN
   // ==========================================
   captureBtn.addEventListener("click", () => {
+    if (isCountingDown || isBurstRunning) return;
+    startCountdownThenCapture();
+  });
+
+  // Fungsi countdown generik yang bisa dipakai burst & capture manual
+  function startCountdownThenCapture(onDone) {
     if (isCountingDown) return;
     isCountingDown = true;
     audioCtx.resume();
 
-    let count = 3;
+    const totalSec = countdownSeconds;
+
+    // Jika instant (0 detik), langsung jepret
+    if (totalSec === 0) {
+      takePhoto();
+      isCountingDown = false;
+      if (onDone) onDone();
+      return;
+    }
+
+    let count = totalSec;
     countdownDisplay.style.display = "block";
     countdownDisplay.textContent = count;
     playSound("beep");
@@ -1121,9 +1171,93 @@ document.addEventListener("DOMContentLoaded", () => {
         countdownDisplay.style.display = "none";
         takePhoto();
         isCountingDown = false;
+        if (onDone) onDone();
       }
     }, 1000);
+  }
+
+  // ==========================================
+  // BURST MODE
+  // ==========================================
+  const burstBtn = document.getElementById("burst-btn");
+  const burstBtnLabel = document.getElementById("burst-btn-label");
+  const burstProgress = document.getElementById("burst-progress");
+  const burstProgressFill = document.getElementById("burst-progress-fill");
+  const burstProgressText = document.getElementById("burst-progress-text");
+
+  let burstStopRequested = false;
+
+  burstBtn.addEventListener("click", () => {
+    if (isBurstRunning) {
+      // Stop burst
+      burstStopRequested = true;
+    } else {
+      startBurst();
+    }
   });
+
+  function startBurst() {
+    const total = photoCount;
+    let current = 0;
+    isBurstRunning = true;
+    burstStopRequested = false;
+
+    // Update UI
+    burstBtn.classList.add("running");
+    burstBtnLabel.textContent = "⛔ Stop Burst";
+    burstProgress.style.display = "block";
+    captureBtn.disabled = true;
+    captureBtn.style.opacity = "0.4";
+
+    function captureNext() {
+      if (burstStopRequested || current >= total) {
+        finishBurst();
+        return;
+      }
+
+      current++;
+      burstProgressText.textContent = `Foto ${current} dari ${total}…`;
+      burstProgressFill.style.width = `${((current - 1) / total) * 100}%`;
+
+      // Kilap sinyal visual di burst progress
+      burstProgressFill.classList.add("pulse");
+
+      startCountdownThenCapture(() => {
+        burstProgressFill.style.width = `${(current / total) * 100}%`;
+        burstProgressFill.classList.remove("pulse");
+
+        if (current < total && !burstStopRequested) {
+          setTimeout(captureNext, burstGapMs);
+        } else {
+          finishBurst();
+        }
+      });
+    }
+
+    captureNext();
+  }
+
+  function finishBurst() {
+    isBurstRunning = false;
+    burstStopRequested = false;
+    burstBtn.classList.remove("running");
+    burstBtnLabel.textContent = "Mulai Burst";
+
+    // Animasi selesai
+    burstProgressFill.style.width = "100%";
+    setTimeout(() => {
+      burstProgress.style.display = "none";
+      burstProgressFill.style.width = "0%";
+    }, 800);
+
+    captureBtn.disabled = false;
+    captureBtn.style.opacity = "";
+
+    // Flash celebrasi singkat di countdown display
+    countdownDisplay.style.display = "block";
+    countdownDisplay.textContent = "🎉";
+    setTimeout(() => { countdownDisplay.style.display = "none"; countdownDisplay.textContent = ""; }, 1200);
+  }
 
   function takePhoto() {
     playSound("shutter");
