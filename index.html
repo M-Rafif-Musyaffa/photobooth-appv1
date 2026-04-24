@@ -2,329 +2,430 @@
 <html lang="id">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-    />
-    <title>Photobooth AI Pro</title>
-    <link
-      href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;900&display=swap"
-      rel="stylesheet"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Pic Booth — Studio Foto</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="style.css" />
-
-    <script
-      src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"
-      crossorigin="anonymous"
-    ></script>
-    <script
-      src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"
-      crossorigin="anonymous"
-    ></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
   </head>
   <body>
-    <button
-      id="menu-toggle"
-      class="mobile-menu-btn"
-      aria-label="Buka Pengaturan"
-    >
-      ☰
-    </button>
+
+    <!-- Mobile hamburger -->
+    <button id="menu-toggle" class="mobile-menu-btn" aria-label="Buka Pengaturan">☰</button>
     <div id="menu-overlay" class="menu-overlay"></div>
+
     <div class="app-dashboard">
+
+      <!-- ========= SIDEBAR ========= -->
       <aside class="cute-navbar">
+
         <div class="brand-section">
-          <h1>✨ Pic Booth</h1>
-          <p>Studio Foto Imutmu</p>
+          <h1>Pic Booth</h1>
+          <p>Studio foto digitalmu ✨</p>
         </div>
 
-        <div class="menu-group">
-          <label>1. Ukuran Per-Foto</label>
-          <div class="pill-selector" id="ratio-selector">
-            <button class="ratio-btn" data-value="4/3">4:3</button>
-            <button class="ratio-btn active" data-value="3/4">3:4</button>
-            <button class="ratio-btn" data-value="1/1">1:1</button>
-            <button class="ratio-btn" data-value="16/9">16:9</button>
-            <button class="ratio-btn" data-value="9/16">9:16</button>
-          </div>
-        </div>
+        <div class="sidebar-scroll">
 
-        <div class="menu-group">
-          <label>2. Jumlah Foto</label>
-          <div class="pill-selector" id="count-selector">
-            <button class="count-btn" data-value="1">1</button>
-            <button class="count-btn" data-value="2">2</button>
-            <button class="count-btn active" data-value="3">3</button>
-            <button class="count-btn" data-value="4">4</button>
-            <button class="count-btn" data-value="5">5</button>
-          </div>
-        </div>
-
-        <div class="menu-group">
-          <label>3. Susunan Bingkai</label>
-          <div class="pill-selector" id="orientation-selector">
-            <button class="orient-btn active" data-value="vertical">
-              ⬇️ Menurun
-            </button>
-            <button class="orient-btn" data-value="horizontal">
-              ➡️ Menyamping
-            </button>
-          </div>
-        </div>
-
-        <div class="menu-group">
-          <label>4. Pilih Tema Unik</label>
-          <div class="card-selector grid-selector" id="theme-selector">
-            <div class="card-option active" data-value="scrapbook">
-              <span>📔 Scrapbook</span>
+          <!-- 1. Rasio -->
+          <div class="menu-group">
+            <div class="step-label">
+              <span class="step-num">1</span>
+              <span>Ukuran Foto</span>
             </div>
-            <div class="card-option" data-value="retro-os">
-              <span>💻 Retro OS</span>
-            </div>
-            <div class="card-option" data-value="neko">
-              <span>🐾 Neko Paws</span>
-            </div>
-            <div class="card-option" data-value="film">
-              <span>🎞️ Film Strip</span>
-            </div>
-            <div class="card-option" data-value="pixel">
-              <span>👾 8-Bit</span>
-            </div>
-            <div class="card-option" data-value="cozy">
-              <span>🍃 Cozy</span>
-            </div>
-            <div class="card-option" data-value="galaxy">
-              <span>🌌 Galaxy</span>
-            </div>
-            <div class="card-option" data-value="dots">
-              <span>🎀 Cute Dots</span>
-            </div>
-            <div class="card-option" data-value="newspaper">
-              <span>📰 Newspaper</span>
-            </div>
-            <div class="card-option" data-value="love">
-              <span>💖 True Love</span>
-            </div>
-            <div class="card-option" data-value="cyberpunk">
-              <span>⚡ Cyberpunk</span>
-            </div>
-            <div class="card-option" data-value="watercolor">
-              <span>🎨 Watercolor</span>
-            </div>
-            <div class="card-option" data-value="vhs">
-              <span>📼 VHS Retro</span>
-            </div>
-            <div class="card-option" data-value="sakura">
-              <span>🌸 Sakura</span>
-            </div>
-            <div class="card-option" data-value="cafe">
-              <span>☕ Cafe</span>
-            </div>
-            <div class="card-option" data-value="polaroid">
-              <span>📷 Polaroid</span>
-            </div>
-            <div class="card-option" data-value="tropical">
-              <span>🌴 Tropical</span>
-            </div>
-            <div class="card-option" data-value="wanted">
-              <span>🤠 Wanted</span>
+            <div class="pill-selector" id="ratio-selector">
+              <button class="ratio-btn" data-value="4/3">4:3</button>
+              <button class="ratio-btn active" data-value="3/4">3:4</button>
+              <button class="ratio-btn" data-value="1/1">1:1</button>
+              <button class="ratio-btn" data-value="16/9">16:9</button>
+              <button class="ratio-btn" data-value="9/16">9:16</button>
             </div>
           </div>
-        </div>
 
-        <div class="menu-group">
-          <label>5. Efek Filter Foto 🌸</label>
-          <div class="pill-selector" id="filter-selector">
-            <button class="filter-btn active" data-filter="none">Normal</button>
-            <button
-              class="filter-btn"
-              data-filter="contrast(1.1) brightness(1.1) saturate(1.3) hue-rotate(-10deg)"
-            >
-              🌸 Peach
-            </button>
-            <button
-              class="filter-btn"
-              data-filter="brightness(1.2) saturate(0.8) contrast(0.9)"
-            >
-              ☁️ Fairy
-            </button>
-            <button
-              class="filter-btn"
-              data-filter="sepia(0.6) contrast(1.1) brightness(0.9) saturate(1.5)"
-            >
-              🎞️ Vintage
-            </button>
-            <button
-              class="filter-btn"
-              data-filter="grayscale(1) contrast(1.2) brightness(1.1)"
-            >
-              🎬 Noir
-            </button>
-
-            <button
-              class="filter-btn"
-              data-filter="sepia(0.3) hue-rotate(180deg) saturate(1.2) contrast(1.1)"
-            >
-              🌊 Ocean
-            </button>
-            <button
-              class="filter-btn"
-              data-filter="sepia(0.4) saturate(1.6) contrast(1.1) brightness(1.1) hue-rotate(-10deg)"
-            >
-              🌇 Golden
-            </button>
-            <button
-              class="filter-btn"
-              data-filter="saturate(2.5) contrast(1.2) hue-rotate(320deg)"
-            >
-              🔮 Neon
-            </button>
-            <button
-              class="filter-btn"
-              data-filter="sepia(0.3) saturate(1.2) brightness(1.05) hue-rotate(40deg)"
-            >
-              🍵 Matcha Latte
-            </button>
-
-            <button
-              class="filter-btn"
-              data-filter="contrast(1.2) saturate(0.8) sepia(0.2) brightness(0.9)"
-            >
-              🎞️ Cinematic
-            </button>
-
-            <button
-              class="filter-btn"
-              data-filter="brightness(1.1) saturate(1.5) contrast(0.95) hue-rotate(-10deg)"
-            >
-              🍭 Candy Pop
-            </button>
-
-            <button
-              class="filter-btn"
-              data-filter="brightness(1.2) contrast(1.1) saturate(0.6) hue-rotate(190deg)"
-            >
-              ❄️ Ice Crystal
-            </button>
-
-            <button
-              class="filter-btn"
-              data-filter="sepia(0.4) brightness(0.95) contrast(1.1) saturate(1.1)"
-            >
-              ☕ Coffee Mood
-            </button>
+          <!-- 2. Jumlah Foto -->
+          <div class="menu-group">
+            <div class="step-label">
+              <span class="step-num">2</span>
+              <span>Jumlah Foto</span>
+            </div>
+            <div class="pill-selector" id="count-selector">
+              <button class="count-btn" data-value="1">1</button>
+              <button class="count-btn" data-value="2">2</button>
+              <button class="count-btn active" data-value="3">3</button>
+              <button class="count-btn" data-value="4">4</button>
+              <button class="count-btn" data-value="5">5</button>
+            </div>
           </div>
-        </div>
 
-        <div class="menu-group">
-          <label>6. Teks Kustom & Tanggal ✍️</label>
-          <input
-            type="text"
-            id="custom-text-input"
-            class="cute-input"
-            placeholder="Misal: Ngedate Bareng Ayang 💖"
-            maxlength="30"
-          />
-          <div class="checkbox-group">
-            <input type="checkbox" id="show-date-check" checked />
-            <label for="show-date-check">Tampilkan Tanggal Hari Ini</label>
+          <!-- 3. Susunan -->
+          <div class="menu-group">
+            <div class="step-label">
+              <span class="step-num">3</span>
+              <span>Susunan Bingkai</span>
+            </div>
+            <div class="pill-selector" id="orientation-selector">
+              <button class="orient-btn active" data-value="vertical">⬇ Menurun</button>
+              <button class="orient-btn" data-value="horizontal">➡ Menyamping</button>
+            </div>
           </div>
-        </div>
 
-        <div class="menu-group">
-          <label>7. Hias dengan Stiker 🎨</label>
-          <p class="hint-text">
-            🖱️ Drag = Geser &nbsp;|&nbsp; 🔄 Shift+Drag = Putar &nbsp;|&nbsp; 🔍
-            Scroll = Resize &nbsp;|&nbsp; 🗑️ DblClick = Hapus
-          </p>
-          <div class="sticker-tray">
-            <!-- 🐾 Cute & Nature -->
-            <button class="add-sticker-btn">🐾</button>
-            <button class="add-sticker-btn">🐱</button>
-            <button class="add-sticker-btn">🐶</button>
-            <button class="add-sticker-btn">🦋</button>
-            <button class="add-sticker-btn">🌸</button>
-            <button class="add-sticker-btn">🌼</button>
-            <button class="add-sticker-btn">🍀</button>
-            <!-- ✨ Sparkles & Magic -->
-            <button class="add-sticker-btn">✨</button>
-            <button class="add-sticker-btn">💫</button>
-            <button class="add-sticker-btn">⭐</button>
-            <button class="add-sticker-btn">🌈</button>
-            <button class="add-sticker-btn">🌙</button>
-            <button class="add-sticker-btn">☁️</button>
-            <!-- 💖 Love & Vibe -->
-            <button class="add-sticker-btn">💖</button>
-            <button class="add-sticker-btn">🤍</button>
-            <button class="add-sticker-btn">🩵</button>
-            <button class="add-sticker-btn">🩷</button>
-            <button class="add-sticker-btn">🎀</button>
-            <button class="add-sticker-btn">👑</button>
-            <!-- 📸 Objects & Aesthetic -->
-            <button class="add-sticker-btn">🕶️</button>
-            <button class="add-sticker-btn">📷</button>
-            <button class="add-sticker-btn">☕</button>
-            <button class="add-sticker-btn">🍰</button>
-            <button class="add-sticker-btn">🎵</button>
-            <button class="add-sticker-btn">🎧</button>
-            <button class="add-sticker-btn">🪄</button>
+          <!-- 4. Tema -->
+          <div class="menu-group">
+            <div class="step-label">
+              <span class="step-num">4</span>
+              <span>Tema Bingkai</span>
+            </div>
+            <div class="card-selector grid-selector" id="theme-selector">
+              <div class="card-option active" data-value="scrapbook"><span>📔 Scrapbook</span></div>
+              <div class="card-option" data-value="retro-os"><span>💻 Retro OS</span></div>
+              <div class="card-option" data-value="neko"><span>🐾 Neko</span></div>
+              <div class="card-option" data-value="film"><span>🎞️ Film</span></div>
+              <div class="card-option" data-value="pixel"><span>👾 8-Bit</span></div>
+              <div class="card-option" data-value="cozy"><span>🍃 Cozy</span></div>
+              <div class="card-option" data-value="galaxy"><span>🌌 Galaxy</span></div>
+              <div class="card-option" data-value="dots"><span>🎀 Dots</span></div>
+              <div class="card-option" data-value="newspaper"><span>📰 Koran</span></div>
+              <div class="card-option" data-value="love"><span>💖 Love</span></div>
+              <div class="card-option" data-value="cyberpunk"><span>⚡ Cyber</span></div>
+              <div class="card-option" data-value="watercolor"><span>🎨 Cat Air</span></div>
+              <div class="card-option" data-value="vhs"><span>📼 VHS</span></div>
+              <div class="card-option" data-value="sakura"><span>🌸 Sakura</span></div>
+              <div class="card-option" data-value="cafe"><span>☕ Cafe</span></div>
+              <div class="card-option" data-value="polaroid"><span>📷 Polaroid</span></div>
+              <div class="card-option" data-value="tropical"><span>🌴 Tropis</span></div>
+              <div class="card-option" data-value="wanted"><span>🤠 Wanted</span></div>
+            </div>
+
+            <!-- 4b. Warna Custom -->
+            <div class="color-customizer">
+              <div class="color-row">
+                <label class="color-label">🎨 Warna Background</label>
+                <div class="color-presets" id="bg-presets">
+                  <button class="color-preset" data-color="#fdfcfa" style="background:#fdfcfa;" title="Putih Krem"></button>
+                  <button class="color-preset" data-color="#fce4ec" style="background:#fce4ec;" title="Pink Muda"></button>
+                  <button class="color-preset" data-color="#e8f5e9" style="background:#e8f5e9;" title="Hijau Mint"></button>
+                  <button class="color-preset" data-color="#e3f2fd" style="background:#e3f2fd;" title="Biru Muda"></button>
+                  <button class="color-preset" data-color="#fff9c4" style="background:#fff9c4;" title="Kuning Lembut"></button>
+                  <button class="color-preset" data-color="#1a1a2e" style="background:#1a1a2e;" title="Hitam Navy"></button>
+                  <button class="color-preset" data-color="#2d1b69" style="background:#2d1b69;" title="Ungu Gelap"></button>
+                  <input type="color" id="custom-bg-color" class="color-picker-input" value="#fdfcfa" title="Warna Custom" />
+                </div>
+              </div>
+              <div class="color-row">
+                <label class="color-label">🖼 Border Slot Foto</label>
+                <div class="border-style-selector" id="border-style-selector">
+                  <button class="border-style-btn active" data-style="none">Tanpa</button>
+                  <button class="border-style-btn" data-style="thin">Tipis</button>
+                  <button class="border-style-btn" data-style="thick">Tebal</button>
+                  <button class="border-style-btn" data-style="polaroid">Polaroid</button>
+                  <button class="border-style-btn" data-style="rounded">Bulat</button>
+                  <button class="border-style-btn" data-style="shadow">Shadow</button>
+                </div>
+                <div class="color-presets" id="border-presets" style="margin-top:6px;">
+                  <button class="color-preset border-preset active" data-color="#ffffff" style="background:#ffffff;border:2px solid #ccc;" title="Putih"></button>
+                  <button class="color-preset border-preset" data-color="#ffb6c1" style="background:#ffb6c1;" title="Pink"></button>
+                  <button class="color-preset border-preset" data-color="#4a2e15" style="background:#4a2e15;" title="Coklat"></button>
+                  <button class="color-preset border-preset" data-color="#000000" style="background:#000000;" title="Hitam"></button>
+                  <button class="color-preset border-preset" data-color="#ffd700" style="background:#ffd700;" title="Gold"></button>
+                  <button class="color-preset border-preset" data-color="#00ffff" style="background:#00ffff;" title="Cyan"></button>
+                  <input type="color" id="custom-border-color" class="color-picker-input" value="#ffffff" title="Warna Border Custom" />
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="menu-group">
-          <label>8. Filter AR Wajah (AI) 🎭</label>
-          <div class="pill-selector" id="ar-selector">
-            <button class="ar-btn active" data-ar="none">Off</button>
-            <button class="ar-btn" data-ar="neko">🐾 Neko Face</button>
-            <button class="ar-btn" data-ar="glasses">🕶️ Cool Glasses</button>
-            <button class="ar-btn" data-ar="bunny">🐰 Bunny Cute</button>
+
+          <!-- 5. Filter -->
+          <div class="menu-group">
+            <div class="step-label">
+              <span class="step-num">5</span>
+              <span>Filter Foto</span>
+            </div>
+            <div class="pill-selector" id="filter-selector">
+              <button class="filter-btn active" data-filter="none">Normal</button>
+              <button class="filter-btn" data-filter="contrast(1.1) brightness(1.1) saturate(1.3) hue-rotate(-10deg)">🌸 Peach</button>
+              <button class="filter-btn" data-filter="brightness(1.2) saturate(0.8) contrast(0.9)">☁️ Fairy</button>
+              <button class="filter-btn" data-filter="sepia(0.6) contrast(1.1) brightness(0.9) saturate(1.5)">🎞️ Vintage</button>
+              <button class="filter-btn" data-filter="grayscale(1) contrast(1.2) brightness(1.1)">🎬 Noir</button>
+              <button class="filter-btn" data-filter="sepia(0.3) hue-rotate(180deg) saturate(1.2) contrast(1.1)">🌊 Ocean</button>
+              <button class="filter-btn" data-filter="sepia(0.4) saturate(1.6) contrast(1.1) brightness(1.1) hue-rotate(-10deg)">🌇 Golden</button>
+              <button class="filter-btn" data-filter="saturate(2.5) contrast(1.2) hue-rotate(320deg)">🔮 Neon</button>
+              <button class="filter-btn" data-filter="sepia(0.3) saturate(1.2) brightness(1.05) hue-rotate(40deg)">🍵 Matcha</button>
+              <button class="filter-btn" data-filter="contrast(1.2) saturate(0.8) sepia(0.2) brightness(0.9)">🎞️ Cinema</button>
+              <button class="filter-btn" data-filter="brightness(1.1) saturate(1.5) contrast(0.95) hue-rotate(-10deg)">🍭 Candy</button>
+              <button class="filter-btn" data-filter="brightness(1.2) contrast(1.1) saturate(0.6) hue-rotate(190deg)">❄️ Ice</button>
+              <button class="filter-btn" data-filter="sepia(0.4) brightness(0.95) contrast(1.1) saturate(1.1)">☕ Coffee</button>
+            </div>
           </div>
-        </div>
+
+          <!-- 6. Teks -->
+          <div class="menu-group">
+            <div class="step-label">
+              <span class="step-num">6</span>
+              <span>Teks & Tanggal</span>
+            </div>
+            <input type="text" id="custom-text-input" class="cute-input" placeholder="Misal: Ngedate Bareng 💖" maxlength="30" />
+            <div class="checkbox-group">
+              <input type="checkbox" id="show-date-check" checked />
+              <label for="show-date-check">Tampilkan tanggal hari ini</label>
+            </div>
+          </div>
+
+          <!-- 7. Stiker -->
+          <div class="menu-group">
+            <div class="step-label">
+              <span class="step-num">7</span>
+              <span>Stiker & Teks</span>
+            </div>
+            <p class="hint-text">
+              🖱 <b>Desktop:</b> Drag = geser &nbsp;·&nbsp; Shift+Drag = putar &nbsp;·&nbsp; Scroll = ubah ukuran &nbsp;·&nbsp; DblClick = hapus<br>
+              📱 <b>Mobile:</b> 1 jari = geser &nbsp;·&nbsp; 2 jari = perbesar/putar &nbsp;·&nbsp; Ketuk 2x = hapus
+            </p>
+
+            <!-- Teks Preset Stiker -->
+            <div class="sticker-section-label">✍️ Teks Preset</div>
+            <div class="text-preset-tray" id="text-preset-tray">
+              <button class="text-preset-btn" data-text="Best Day Ever ✨">Best Day Ever ✨</button>
+              <button class="text-preset-btn" data-text="Golden Hour 🌇">Golden Hour 🌇</button>
+              <button class="text-preset-btn" data-text="VSCO Vibes">VSCO Vibes</button>
+              <button class="text-preset-btn" data-text="Core Memory 💭">Core Memory 💭</button>
+              <button class="text-preset-btn" data-text="No Filter Needed">No Filter Needed</button>
+              <button class="text-preset-btn" data-text="Captured 📷">Captured 📷</button>
+              <button class="text-preset-btn" data-text="Film 2025 🎞️">Film 2025 🎞️</button>
+              <button class="text-preset-btn" data-text="Living My Best Life">Living My Best Life</button>
+              <button class="text-preset-btn" data-text="Foto Bareng Bestie 💕">Foto Bareng Bestie 💕</button>
+              <button class="text-preset-btn" data-text="Ngedate Seru 🥰">Ngedate Seru 🥰</button>
+              <button class="text-preset-btn" data-text="Finally!!! 🎉">Finally!!! 🎉</button>
+              <button class="text-preset-btn" data-text="Aesthetic ✦">Aesthetic ✦</button>
+            </div>
+
+            <!-- Teks Custom Draggable -->
+            <div class="sticker-section-label" style="margin-top:10px;">⌨️ Teks Sendiri</div>
+            <div class="custom-text-sticker-row">
+              <input type="text" id="drag-text-input" class="cute-input" placeholder="Tulis teks..." maxlength="25" style="margin-bottom:0;flex:1;" />
+              <button id="add-text-sticker-btn" class="btn-add-text">+ Tambah</button>
+            </div>
+
+            <!-- Emoji Stiker -->
+            <div class="sticker-section-label" style="margin-top:10px;">😄 Emoji Stiker</div>
+            <div class="sticker-tray">
+              <button class="add-sticker-btn">🐾</button>
+              <button class="add-sticker-btn">🐱</button>
+              <button class="add-sticker-btn">🐶</button>
+              <button class="add-sticker-btn">🦋</button>
+              <button class="add-sticker-btn">🌸</button>
+              <button class="add-sticker-btn">🌼</button>
+              <button class="add-sticker-btn">🍀</button>
+              <button class="add-sticker-btn">✨</button>
+              <button class="add-sticker-btn">💫</button>
+              <button class="add-sticker-btn">⭐</button>
+              <button class="add-sticker-btn">🌈</button>
+              <button class="add-sticker-btn">🌙</button>
+              <button class="add-sticker-btn">☁️</button>
+              <button class="add-sticker-btn">💖</button>
+              <button class="add-sticker-btn">🤍</button>
+              <button class="add-sticker-btn">🩵</button>
+              <button class="add-sticker-btn">🩷</button>
+              <button class="add-sticker-btn">🎀</button>
+              <button class="add-sticker-btn">👑</button>
+              <button class="add-sticker-btn">🕶️</button>
+              <button class="add-sticker-btn">📷</button>
+              <button class="add-sticker-btn">☕</button>
+              <button class="add-sticker-btn">🍰</button>
+              <button class="add-sticker-btn">🎵</button>
+              <button class="add-sticker-btn">🎧</button>
+              <button class="add-sticker-btn">🪄</button>
+            </div>
+          </div>
+
+          <!-- 8. AR Filter -->
+          <div class="menu-group">
+            <div class="step-label">
+              <span class="step-num">8</span>
+              <span>Filter AR Wajah (AI)</span>
+            </div>
+            <div class="pill-selector" id="ar-selector">
+              <button class="ar-btn active" data-ar="none">Off</button>
+              <button class="ar-btn" data-ar="neko">🐾 Neko</button>
+              <button class="ar-btn" data-ar="glasses">🕶️ Glasses</button>
+              <button class="ar-btn" data-ar="bunny">🐰 Bunny</button>
+            </div>
+          </div>
+
+          <!-- 9. Background Removal -->
+          <div class="menu-group">
+            <div class="step-label">
+              <span class="step-num">9</span>
+              <span>Background Removal (AI) 🪄</span>
+            </div>
+
+            <!-- Toggle ON/OFF -->
+            <div class="bg-remove-toggle-row">
+              <span class="bg-remove-label">Hapus Background</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="bg-remove-toggle" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <!-- Pilihan Background Pengganti -->
+            <div id="bg-replace-options" class="bg-replace-options" style="display:none;">
+              <div class="export-section-label" style="margin-top:8px;">Ganti dengan:</div>
+
+              <!-- Warna solid -->
+              <div class="pill-selector" id="bg-replace-type">
+                <button class="bg-type-btn active" data-type="transparent">⬜ Transparan</button>
+                <button class="bg-type-btn" data-type="color">🎨 Warna</button>
+                <button class="bg-type-btn" data-type="gradient">🌈 Gradien</button>
+                <button class="bg-type-btn" data-type="blur">💨 Blur</button>
+              </div>
+
+              <!-- Color picker (muncul jika mode warna) -->
+              <div id="bg-color-row" class="color-row" style="margin-top:8px; display:none;">
+                <div class="color-presets">
+                  <button class="color-preset bg-solid-preset active" data-color="#ffffff" style="background:#ffffff;border:2px solid #ccc;"></button>
+                  <button class="color-preset bg-solid-preset" data-color="#000000" style="background:#000000;"></button>
+                  <button class="color-preset bg-solid-preset" data-color="#fce4ec" style="background:#fce4ec;"></button>
+                  <button class="color-preset bg-solid-preset" data-color="#e8f5e9" style="background:#e8f5e9;"></button>
+                  <button class="color-preset bg-solid-preset" data-color="#e3f2fd" style="background:#e3f2fd;"></button>
+                  <button class="color-preset bg-solid-preset" data-color="#fff9c4" style="background:#fff9c4;"></button>
+                  <button class="color-preset bg-solid-preset" data-color="#f3e5f5" style="background:#f3e5f5;"></button>
+                  <input type="color" id="bg-solid-custom" class="color-picker-input" value="#ffffff" />
+                </div>
+              </div>
+
+              <!-- Gradient picker (muncul jika mode gradien) -->
+              <div id="bg-gradient-row" class="color-row" style="margin-top:8px; display:none;">
+                <div class="gradient-presets" id="gradient-presets">
+                  <button class="gradient-preset active" data-g1="#ff9a9e" data-g2="#fecfef" style="background:linear-gradient(135deg,#ff9a9e,#fecfef);" title="Rose"></button>
+                  <button class="gradient-preset" data-g1="#a18cd1" data-g2="#fbc2eb" style="background:linear-gradient(135deg,#a18cd1,#fbc2eb);" title="Lavender"></button>
+                  <button class="gradient-preset" data-g1="#84fab0" data-g2="#8fd3f4" style="background:linear-gradient(135deg,#84fab0,#8fd3f4);" title="Ocean"></button>
+                  <button class="gradient-preset" data-g1="#fddb92" data-g2="#d1fdff" style="background:linear-gradient(135deg,#fddb92,#d1fdff);" title="Sunrise"></button>
+                  <button class="gradient-preset" data-g1="#0f0c29" data-g2="#302b63" style="background:linear-gradient(135deg,#0f0c29,#302b63);" title="Galaxy"></button>
+                  <button class="gradient-preset" data-g1="#f7971e" data-g2="#ffd200" style="background:linear-gradient(135deg,#f7971e,#ffd200);" title="Golden"></button>
+                  <button class="gradient-preset" data-g1="#43cea2" data-g2="#185a9d" style="background:linear-gradient(135deg,#43cea2,#185a9d);" title="Teal Blue"></button>
+                  <button class="gradient-preset" data-g1="#ee0979" data-g2="#ff6a00" style="background:linear-gradient(135deg,#ee0979,#ff6a00);" title="Flame"></button>
+                </div>
+              </div>
+
+              <!-- Status loading -->
+              <div id="bg-remove-status" class="bg-remove-status"></div>
+            </div>
+          </div>
+
+        </div><!-- /sidebar-scroll -->
       </aside>
 
+      <!-- ========= MAIN WORKSPACE ========= -->
       <main class="workspace-section">
+
         <header class="workspace-header">
-          <h2>Selamat Datang!</h2>
-          <p>Jepret fotomu, lalu pasang di susunan bingkai sebelah kanan.</p>
+          <h2>Studio Foto</h2>
+          <p>Jepret foto → klik slot di bingkai → download 🎉</p>
         </header>
 
         <div class="main-content">
+
+          <!-- Camera Panel -->
           <div class="camera-panel">
             <div class="video-wrapper">
               <video id="camera-stream" autoplay playsinline></video>
               <canvas id="ar-overlay"></canvas>
-
               <div id="countdown-display" class="countdown-text"></div>
               <div id="flash-overlay"></div>
             </div>
+
             <div class="gallery-section">
-              <h3>Galeri Jepretan 👇 (Klik foto)</h3>
+              <h3>Foto tersimpan — klik untuk pasang ke bingkai</h3>
               <div id="photo-gallery" class="gallery"></div>
             </div>
-            <button id="capture-btn" class="btn-primary context-btn">
-              📸 Jepret Foto!
-            </button>
+
+            <button id="capture-btn" class="btn-primary context-btn">📸 Jepret Foto</button>
           </div>
 
+          <!-- Frame Panel -->
           <div class="frame-panel">
-            <div
-              id="frame-workspace"
-              class="frame-strip layout-vertical theme-scrapbook"
-            >
-              <div
-                id="frame-workspace"
-                class="frame-strip theme-scrapbook layout-vertical"
-              ></div>
-            </div>
+            <div class="frame-label">Pratinjau Bingkai — klik slot kosong untuk pasang foto</div>
+            <div id="frame-workspace" class="frame-strip layout-vertical theme-scrapbook"></div>
             <div class="panel-actions">
-              <button id="generate-btn" class="btn-primary context-btn">
-                💖 Cetak & Download
+              <button id="generate-btn" class="btn-success context-btn">⬇ Cetak & Download</button>
+            </div>
+          </div>
+
+        </div>
+
+        <canvas id="render-canvas" style="display:none"></canvas>
+      </main>
+    </div>
+
+    <!-- ========= EXPORT MODAL ========= -->
+    <div id="export-modal" class="modal-backdrop">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3>💾 Simpan & Bagikan</h3>
+          <button id="export-modal-close" class="modal-close">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <!-- Preview -->
+          <div class="export-preview-wrap">
+            <img id="export-preview-img" src="" alt="Preview" class="export-preview-img" />
+          </div>
+
+          <!-- Format -->
+          <div class="export-section">
+            <div class="export-section-label">Format File</div>
+            <div class="fmt-selector">
+              <button class="fmt-btn active" data-fmt="png">
+                <span class="fmt-icon">🖼</span>
+                <span class="fmt-name">PNG</span>
+                <span class="fmt-desc">Kualitas terbaik</span>
+              </button>
+              <button class="fmt-btn" data-fmt="jpg">
+                <span class="fmt-icon">📷</span>
+                <span class="fmt-name">JPG</span>
+                <span class="fmt-desc">File lebih kecil</span>
+              </button>
+              <button class="fmt-btn" data-fmt="webp">
+                <span class="fmt-icon">⚡</span>
+                <span class="fmt-name">WebP</span>
+                <span class="fmt-desc">Modern & ringan</span>
               </button>
             </div>
           </div>
-        </div>
 
-        <canvas id="render-canvas" style="display: none"></canvas>
-      </main>
+          <!-- Aksi utama -->
+          <div class="export-actions">
+            <button id="export-download-btn" class="btn-export-download">
+              ⬇ Download
+            </button>
+            <button id="export-share-btn" class="btn-export-share">
+              ↗ Share
+            </button>
+          </div>
+
+          <!-- Share fallback -->
+          <div id="share-fallback" class="share-fallback">
+            <div class="share-fallback-label">Bagikan ke:</div>
+            <div class="share-platform-row">
+              <button id="share-copy-btn" class="share-platform-btn">
+                <span>📋</span><span>Copy Gambar</span>
+              </button>
+              <button id="share-ig-btn" class="share-platform-btn ig">
+                <span>📸</span><span>Instagram</span>
+              </button>
+              <button id="share-tw-btn" class="share-platform-btn tw">
+                <span>🐦</span><span>Twitter / X</span>
+              </button>
+              <button id="share-wa-btn" class="share-platform-btn wa">
+                <span>💬</span><span>WhatsApp</span>
+              </button>
+            </div>
+            <p class="share-note">💡 Tip: Download dulu, lalu unggah ke platform favoritmu!</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script src="script.js"></script>

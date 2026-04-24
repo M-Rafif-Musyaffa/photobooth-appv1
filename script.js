@@ -66,9 +66,25 @@ document.addEventListener("DOMContentLoaded", () => {
   let photoCount = 3;
   let currentOrientation = "vertical";
   let currentFilter = "none";
-  let currentAR = "none"; // State untuk Filter AI
+  let currentAR = "none";
   let slotData = [];
   let isCountingDown = false;
+
+  // State Fitur Baru
+  let customBgColor = null;       // null = ikuti tema
+  let customBorderColor = "#ffffff";
+  let currentBorderStyle = "none"; // none, thin, thick, polaroid, rounded, shadow
+
+  // State Background Removal
+  let bgRemoveEnabled = false;
+  let bgReplaceType = "transparent";
+  let bgSolidColor = "#ffffff";
+  let bgGradient1 = "#ff9a9e";
+  let bgGradient2 = "#fecfef";
+  let selfieSegmentation = null;
+  let segmentationReady = false;
+  const bgCanvas = document.createElement("canvas");
+  const bgCtx = bgCanvas.getContext("2d", { willReadFrequently: true });
 
   // ==========================================
   // 2. AUDIO FEEDBACK (Synthesizer Tanpa File)
@@ -461,9 +477,63 @@ document.addEventListener("DOMContentLoaded", () => {
   // ==========================================
   // 5. GENERATE SLOT & DRAGGABLE STICKER
   // ==========================================
+
+  // --- Fungsi helper warna custom (didefinisikan lebih awal agar bisa dipakai renderSlots) ---
+  function applyCustomBg() {
+    if (customBgColor) {
+      frameWorkspace.style.backgroundColor = customBgColor;
+    } else {
+      frameWorkspace.style.backgroundColor = "";
+    }
+  }
+
+  function applyBorderToSlots() {
+    document.querySelectorAll(".slot").forEach((slot) => {
+      if (currentBorderStyle === "none") {
+        slot.style.border = "";
+        slot.style.borderRadius = "";
+        slot.style.boxShadow = "";
+        slot.style.outline = "";
+        slot.style.outlineOffset = "";
+        slot.style.padding = "";
+      } else if (currentBorderStyle === "polaroid") {
+        slot.style.border = "none";
+        slot.style.outline = `10px solid ${customBorderColor}`;
+        slot.style.outlineOffset = "-10px";
+        slot.style.borderRadius = "2px";
+        slot.style.boxShadow = `0 4px 15px rgba(0,0,0,0.15)`;
+        slot.style.padding = "0 0 24px 0";
+      } else if (currentBorderStyle === "thin") {
+        slot.style.border = `2px solid ${customBorderColor}`;
+        slot.style.borderRadius = "4px";
+        slot.style.boxShadow = "none";
+        slot.style.outline = "";
+        slot.style.padding = "0";
+      } else if (currentBorderStyle === "thick") {
+        slot.style.border = `6px solid ${customBorderColor}`;
+        slot.style.borderRadius = "4px";
+        slot.style.boxShadow = "none";
+        slot.style.outline = "";
+        slot.style.padding = "0";
+      } else if (currentBorderStyle === "rounded") {
+        slot.style.border = `4px solid ${customBorderColor}`;
+        slot.style.borderRadius = "20px";
+        slot.style.boxShadow = "none";
+        slot.style.outline = "";
+        slot.style.padding = "0";
+      } else if (currentBorderStyle === "shadow") {
+        slot.style.border = `2px solid ${customBorderColor}`;
+        slot.style.borderRadius = "8px";
+        slot.style.boxShadow = `0 6px 20px rgba(0,0,0,0.25)`;
+        slot.style.outline = "";
+        slot.style.padding = "0";
+      }
+    });
+  }
+
   function renderSlots() {
     const existingStickers = Array.from(
-      frameWorkspace.querySelectorAll(".draggable-sticker"),
+      frameWorkspace.querySelectorAll(".draggable-sticker, .draggable-text-sticker"),
     );
     frameWorkspace.innerHTML = "";
     existingStickers.forEach((st) => frameWorkspace.appendChild(st));
@@ -490,17 +560,166 @@ document.addEventListener("DOMContentLoaded", () => {
       });
       frameWorkspace.appendChild(slot);
     }
+
+    applyCustomBg();
+    applyBorderToSlots();
   }
   renderSlots();
 
-  // Logika Drag & Drop Stiker DOM
-  // Logika Drag, Resize & Rotate Stiker DOM
+  // ==========================================
+  // STIKER — Drag, Pinch Resize, Rotate
+  // Support: Mouse (desktop) + Touch (mobile)
+  // ==========================================
   let activeSticker = null;
-  let isDragging = false,
-    isRotating = false;
-  let dragOffsetX = 0,
-    dragOffsetY = 0,
-    startAngle = 0;
+  let isDragging = false, isRotating = false;
+  let dragOffsetX = 0, dragOffsetY = 0, startAngle = 0;
+
+  // Pinch state (mobile 2-finger gesture)
+  let pinchStartDist = 0, pinchStartScale = 1;
+  let pinchStartAngle = 0, pinchStartRotation = 0;
+  let isPinching = false;
+
+  function getTouchDist(t1, t2) {
+    const dx = t1.clientX - t2.clientX;
+    const dy = t1.clientY - t2.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function getTouchAngle(t1, t2) {
+    return Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX) * (180 / Math.PI);
+  }
+
+  function getTouchMidpoint(t1, t2) {
+    return {
+      x: (t1.clientX + t2.clientX) / 2,
+      y: (t1.clientY + t2.clientY) / 2,
+    };
+  }
+
+  function applyScale(el, scale) {
+    const clamped = Math.max(0.3, Math.min(4.0, scale));
+    el.dataset.scale = clamped.toFixed(2);
+    if (el.classList.contains("draggable-text-sticker")) {
+      el.style.fontSize = `${16 * clamped}px`;
+    } else {
+      el.style.fontSize = `${30 * clamped}px`;
+    }
+  }
+
+  function applyRotation(el, deg) {
+    el.dataset.rotation = deg.toFixed(1);
+    el.style.transform = `translate(-50%, -50%) rotate(${deg}deg)`;
+  }
+
+  function attachStickerEvents(stickerEl) {
+    // --- Double-tap / dblclick to delete ---
+    let lastTap = 0;
+    stickerEl.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
+      stickerEl.remove();
+    });
+    stickerEl.addEventListener("touchend", (e) => {
+      const now = Date.now();
+      if (now - lastTap < 300) {
+        e.preventDefault();
+        stickerEl.remove();
+      }
+      lastTap = now;
+    });
+
+    // --- MOUSE: drag & shift+drag rotate ---
+    stickerEl.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      activeSticker = stickerEl;
+      document.querySelectorAll(".draggable-sticker, .draggable-text-sticker").forEach((s) => s.classList.remove("selected"));
+      stickerEl.classList.add("selected");
+
+      if (e.shiftKey) {
+        isRotating = true;
+        const wsRect = frameWorkspace.getBoundingClientRect();
+        const cx = wsRect.left + (parseFloat(stickerEl.style.left) / 100) * wsRect.width;
+        const cy = wsRect.top + (parseFloat(stickerEl.style.top) / 100) * wsRect.height;
+        startAngle = Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI)
+          - parseFloat(stickerEl.dataset.rotation || 0);
+      } else {
+        isDragging = true;
+        const rect = stickerEl.getBoundingClientRect();
+        dragOffsetX = e.clientX - rect.left - rect.width / 2;
+        dragOffsetY = e.clientY - rect.top - rect.height / 2;
+      }
+    });
+
+    // --- MOUSE: scroll to resize ---
+    stickerEl.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const current = parseFloat(stickerEl.dataset.scale || 1);
+      applyScale(stickerEl, current - e.deltaY * 0.005);
+    }, { passive: false });
+
+    // --- TOUCH: single-finger drag, two-finger pinch+rotate ---
+    stickerEl.addEventListener("touchstart", (e) => {
+      e.stopPropagation();
+      document.querySelectorAll(".draggable-sticker, .draggable-text-sticker").forEach((s) => s.classList.remove("selected"));
+      stickerEl.classList.add("selected");
+      activeSticker = stickerEl;
+
+      if (e.touches.length === 1) {
+        // Single finger — drag
+        isPinching = false;
+        isDragging = true;
+        const touch = e.touches[0];
+        const wsRect = frameWorkspace.getBoundingClientRect();
+        const curLeft = (parseFloat(stickerEl.style.left) / 100) * wsRect.width;
+        const curTop  = (parseFloat(stickerEl.style.top) / 100) * wsRect.height;
+        dragOffsetX = touch.clientX - wsRect.left - curLeft;
+        dragOffsetY = touch.clientY - wsRect.top - curTop;
+      } else if (e.touches.length === 2) {
+        // Two fingers — pinch resize + rotate
+        isPinching = true;
+        isDragging = false;
+        pinchStartDist = getTouchDist(e.touches[0], e.touches[1]);
+        pinchStartScale = parseFloat(stickerEl.dataset.scale || 1);
+        pinchStartAngle = getTouchAngle(e.touches[0], e.touches[1]);
+        pinchStartRotation = parseFloat(stickerEl.dataset.rotation || 0);
+      }
+    }, { passive: true });
+
+    stickerEl.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+      if (!activeSticker || activeSticker !== stickerEl) return;
+      const wsRect = frameWorkspace.getBoundingClientRect();
+
+      if (e.touches.length === 1 && isDragging && !isPinching) {
+        const touch = e.touches[0];
+        let nx = ((touch.clientX - wsRect.left - dragOffsetX) / wsRect.width) * 100;
+        let ny = ((touch.clientY - wsRect.top - dragOffsetY) / wsRect.height) * 100;
+        stickerEl.style.left = `${nx}%`;
+        stickerEl.style.top = `${ny}%`;
+      } else if (e.touches.length === 2 && isPinching) {
+        // Scale
+        const newDist = getTouchDist(e.touches[0], e.touches[1]);
+        const scaleFactor = newDist / pinchStartDist;
+        applyScale(stickerEl, pinchStartScale * scaleFactor);
+
+        // Rotate
+        const newAngle = getTouchAngle(e.touches[0], e.touches[1]);
+        const deltaAngle = newAngle - pinchStartAngle;
+        applyRotation(stickerEl, pinchStartRotation + deltaAngle);
+
+        // Move to midpoint of two fingers
+        const mid = getTouchMidpoint(e.touches[0], e.touches[1]);
+        let nx = ((mid.x - wsRect.left) / wsRect.width) * 100;
+        let ny = ((mid.y - wsRect.top) / wsRect.height) * 100;
+        stickerEl.style.left = `${nx}%`;
+        stickerEl.style.top = `${ny}%`;
+      }
+    }, { passive: false });
+
+    stickerEl.addEventListener("touchend", (e) => {
+      if (e.touches.length < 2) isPinching = false;
+      if (e.touches.length === 0) { isDragging = false; activeSticker = null; }
+    });
+  }
 
   stickerBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -512,56 +731,51 @@ document.addEventListener("DOMContentLoaded", () => {
       stickerEl.style.left = "50%";
       stickerEl.style.top = "50%";
 
-      // Hapus seleksi stiker lain
-      document
-        .querySelectorAll(".draggable-sticker")
-        .forEach((s) => s.classList.remove("selected"));
+      document.querySelectorAll(".draggable-sticker, .draggable-text-sticker").forEach((s) => s.classList.remove("selected"));
       frameWorkspace.appendChild(stickerEl);
-
-      stickerEl.addEventListener("dblclick", (e) => {
-        e.stopPropagation();
-        stickerEl.remove();
-      });
-
-      stickerEl.addEventListener("mousedown", (e) => {
-        e.preventDefault();
-        activeSticker = stickerEl;
-
-        if (e.shiftKey) {
-          isRotating = true;
-          const wsRect = frameWorkspace.getBoundingClientRect();
-          const centerX =
-            wsRect.left +
-            (parseFloat(stickerEl.style.left) / 100) * wsRect.width;
-          const centerY =
-            wsRect.top +
-            (parseFloat(stickerEl.style.top) / 100) * wsRect.height;
-          startAngle =
-            Math.atan2(e.clientY - centerY, e.clientX - centerX) *
-              (180 / Math.PI) -
-            parseFloat(stickerEl.dataset.rotation);
-        } else {
-          isDragging = true;
-          const rect = stickerEl.getBoundingClientRect();
-          dragOffsetX = e.clientX - rect.left - rect.width / 2;
-          dragOffsetY = e.clientY - rect.top - rect.height / 2;
-        }
-      });
-
-      stickerEl.addEventListener(
-        "wheel",
-        (e) => {
-          e.preventDefault();
-          let current = parseFloat(stickerEl.dataset.scale);
-          let next = Math.max(0.3, Math.min(4.0, current - e.deltaY * 0.005));
-          stickerEl.dataset.scale = next.toFixed(2);
-          stickerEl.style.fontSize = `${30 * next}px`;
-        },
-        { passive: false },
-      );
+      attachStickerEvents(stickerEl);
     });
   });
 
+  // ==========================================
+  // TEKS STIKER — Preset & Custom Draggable
+  // ==========================================
+  function createTextSticker(text) {
+    const el = document.createElement("div");
+    el.className = "draggable-text-sticker selected";
+    el.textContent = text;
+    el.dataset.scale = "1.0";
+    el.dataset.rotation = "0";
+    // Place randomly near center so multiple don't stack
+    el.style.left = `${40 + Math.random() * 20}%`;
+    el.style.top  = `${40 + Math.random() * 20}%`;
+
+    document.querySelectorAll(".draggable-sticker, .draggable-text-sticker").forEach((s) => s.classList.remove("selected"));
+    frameWorkspace.appendChild(el);
+    attachStickerEvents(el);
+  }
+
+  // Preset text buttons
+  document.querySelectorAll(".text-preset-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      createTextSticker(btn.dataset.text);
+    });
+  });
+
+  // Custom text button
+  document.getElementById("add-text-sticker-btn").addEventListener("click", () => {
+    const input = document.getElementById("drag-text-input");
+    const val = input.value.trim();
+    if (!val) { input.focus(); return; }
+    createTextSticker(val);
+    input.value = "";
+  });
+
+  document.getElementById("drag-text-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("add-text-sticker-btn").click();
+  });
+
+  // --- Global mouse move/up (desktop) ---
   document.addEventListener("mousemove", (e) => {
     if (!activeSticker) return;
     const wsRect = frameWorkspace.getBoundingClientRect();
@@ -572,25 +786,16 @@ document.addEventListener("DOMContentLoaded", () => {
       activeSticker.style.left = `${nx}%`;
       activeSticker.style.top = `${ny}%`;
     } else if (isRotating) {
-      const cx =
-        wsRect.left +
-        (parseFloat(activeSticker.style.left) / 100) * wsRect.width;
-      const cy =
-        wsRect.top +
-        (parseFloat(activeSticker.style.top) / 100) * wsRect.height;
-      let newAngle =
-        Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI) -
-        startAngle;
-      activeSticker.dataset.rotation = newAngle.toFixed(1);
-      activeSticker.style.transform = `translate(-50%, -50%) rotate(${newAngle}deg)`;
+      const cx = wsRect.left + (parseFloat(activeSticker.style.left) / 100) * wsRect.width;
+      const cy = wsRect.top + (parseFloat(activeSticker.style.top) / 100) * wsRect.height;
+      let newAngle = Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI) - startAngle;
+      applyRotation(activeSticker, newAngle);
     }
   });
 
   document.addEventListener("mouseup", () => {
-    if (activeSticker) {
-      isDragging = false;
-      isRotating = false;
-    }
+    isDragging = false;
+    isRotating = false;
   });
 
   // ==========================================
@@ -658,13 +863,241 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.querySelectorAll(".ar-btn").forEach((btn) =>
     btn.addEventListener("click", (e) => {
-      document
-        .querySelectorAll(".ar-btn")
-        .forEach((b) => b.classList.remove("active"));
+      document.querySelectorAll(".ar-btn").forEach((b) => b.classList.remove("active"));
       e.target.classList.add("active");
       currentAR = e.target.getAttribute("data-ar");
     }),
   );
+
+  // ==========================================
+  // BACKGROUND REMOVAL — Setup & Events
+  // ==========================================
+  function setStatus(msg, type = "") {
+    const el = document.getElementById("bg-remove-status");
+    el.textContent = msg;
+    el.className = "bg-remove-status " + type;
+  }
+
+  function initSelfieSegmentation() {
+    if (selfieSegmentation) return; // sudah init
+
+    setStatus("⏳ Memuat model AI...", "loading");
+
+    selfieSegmentation = new SelfieSegmentation({
+      locateFile: (file) =>
+        `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`,
+    });
+
+    selfieSegmentation.setOptions({ modelSelection: 1 }); // 1 = landscape model, lebih akurat
+
+    selfieSegmentation.onResults((results) => {
+      if (!bgRemoveEnabled) return;
+
+      const w = video.videoWidth;
+      const h = video.videoHeight;
+
+      // Pastikan ukuran semua canvas sama
+      bgCanvas.width  = w;
+      bgCanvas.height = h;
+      arCanvas.width  = w;
+      arCanvas.height = h;
+
+      // --- Langkah 1: Ambil frame video (sudah di-mirror di CSS via scaleX(-1) pada video) ---
+      // Kita gambar video mentah (belum mirror) ke bgCanvas untuk pixel picking
+      bgCtx.clearRect(0, 0, w, h);
+      bgCtx.drawImage(results.image, 0, 0, w, h); // image dari mediapipe = frame asli (tidak mirror)
+      const frameData = bgCtx.getImageData(0, 0, w, h);
+
+      // --- Langkah 2: Baca mask segmentasi ---
+      bgCtx.clearRect(0, 0, w, h);
+      bgCtx.drawImage(results.segmentationMask, 0, 0, w, h);
+      const maskData = bgCtx.getImageData(0, 0, w, h);
+
+      // --- Langkah 3: Buat output pixel - orang transparan, bg transparan ---
+      const output = new ImageData(w, h);
+      for (let i = 0; i < maskData.data.length; i += 4) {
+        const alpha = maskData.data[i]; // channel merah = nilai mask (255=orang, 0=bg)
+        output.data[i]     = frameData.data[i];
+        output.data[i + 1] = frameData.data[i + 1];
+        output.data[i + 2] = frameData.data[i + 2];
+        output.data[i + 3] = alpha;
+      }
+
+      // --- Langkah 4: Render ke arCanvas ---
+      arCtx.clearRect(0, 0, w, h);
+
+      // 4a. Gambar background pengganti (tanpa mirror)
+      if (bgReplaceType === "color") {
+        arCtx.fillStyle = bgSolidColor;
+        arCtx.fillRect(0, 0, w, h);
+      } else if (bgReplaceType === "gradient") {
+        const grad = arCtx.createLinearGradient(0, 0, w, h);
+        grad.addColorStop(0, bgGradient1);
+        grad.addColorStop(1, bgGradient2);
+        arCtx.fillStyle = grad;
+        arCtx.fillRect(0, 0, w, h);
+      } else if (bgReplaceType === "blur") {
+        arCtx.filter = "blur(18px)";
+        arCtx.drawImage(results.image, 0, 0, w, h);
+        arCtx.filter = "none";
+      }
+      // transparent: biarkan kosong (checkerboard dari CSS)
+
+      // 4b. Gambar orang (dengan alpha mask) di atas background
+      bgCtx.clearRect(0, 0, w, h);
+      bgCtx.putImageData(output, 0, 0);
+      arCtx.drawImage(bgCanvas, 0, 0);
+
+      // 4c. Mirror seluruh arCanvas (sama seperti video yang di-mirror CSS)
+      // Gunakan teknik: copy ke temp, flip, paste balik
+      bgCtx.clearRect(0, 0, w, h);
+      bgCtx.save();
+      bgCtx.translate(w, 0);
+      bgCtx.scale(-1, 1);
+      bgCtx.drawImage(arCanvas, 0, 0);
+      bgCtx.restore();
+      arCtx.clearRect(0, 0, w, h);
+      arCtx.drawImage(bgCanvas, 0, 0);
+    });
+
+    // Inisiasi pertama dengan mengirim frame awal
+    const tempSend = async () => {
+      try {
+        await selfieSegmentation.send({ image: video });
+        segmentationReady = true;
+        setStatus("✅ Siap! Background dihapus.", "ready");
+      } catch {
+        setStatus("❌ Gagal memuat model.", "error");
+      }
+    };
+    video.addEventListener("loadeddata", tempSend, { once: true });
+    if (video.readyState >= 2) tempSend();
+  }
+
+  // Loop segmentasi — dijalankan bersamaan dengan faceMesh loop
+  async function segmentFrame() {
+    if (bgRemoveEnabled && selfieSegmentation && segmentationReady) {
+      try {
+        await selfieSegmentation.send({ image: video });
+      } catch { /* skip frame error */ }
+    }
+    requestAnimationFrame(segmentFrame);
+  }
+  segmentFrame();
+
+  // Toggle ON/OFF
+  document.getElementById("bg-remove-toggle").addEventListener("change", (e) => {
+    bgRemoveEnabled = e.target.checked;
+    const optionsEl = document.getElementById("bg-replace-options");
+    const videoWrapper = document.querySelector(".video-wrapper");
+
+    if (bgRemoveEnabled) {
+      optionsEl.style.display = "flex";
+      videoWrapper.classList.add("bg-active");
+      initSelfieSegmentation();
+    } else {
+      optionsEl.style.display = "none";
+      videoWrapper.classList.remove("bg-active");
+      // Bersihkan arCanvas dari compositing bg removal (biarkan AR filter tetap jalan)
+      arCtx.clearRect(0, 0, arCanvas.width, arCanvas.height);
+      setStatus("");
+    }
+  });
+
+  // Pilih tipe background pengganti
+  document.querySelectorAll(".bg-type-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".bg-type-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      bgReplaceType = btn.dataset.type;
+      document.getElementById("bg-color-row").style.display    = bgReplaceType === "color"    ? "block" : "none";
+      document.getElementById("bg-gradient-row").style.display = bgReplaceType === "gradient" ? "block" : "none";
+    });
+  });
+
+  // Preset warna solid
+  document.querySelectorAll(".bg-solid-preset").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".bg-solid-preset").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      bgSolidColor = btn.dataset.color;
+      document.getElementById("bg-solid-custom").value = bgSolidColor;
+    });
+  });
+  document.getElementById("bg-solid-custom").addEventListener("input", (e) => {
+    bgSolidColor = e.target.value;
+    document.querySelectorAll(".bg-solid-preset").forEach(b => b.classList.remove("active"));
+  });
+
+  // Preset gradien
+  document.querySelectorAll(".gradient-preset").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".gradient-preset").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      bgGradient1 = btn.dataset.g1;
+      bgGradient2 = btn.dataset.g2;
+    });
+  });
+
+  // ==========================================
+  // FITUR BARU: TEMA WARNA CUSTOM — Event Listeners
+  // ==========================================
+
+  // Preset warna background
+  document.querySelectorAll("#bg-presets .color-preset").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("#bg-presets .color-preset").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      customBgColor = btn.dataset.color;
+      document.getElementById("custom-bg-color").value = customBgColor;
+      applyCustomBg();
+    });
+  });
+
+  document.getElementById("custom-bg-color").addEventListener("input", (e) => {
+    customBgColor = e.target.value;
+    document.querySelectorAll("#bg-presets .color-preset").forEach((b) => b.classList.remove("active"));
+    applyCustomBg();
+  });
+
+  // Reset bg saat ganti tema
+  document.querySelectorAll(".card-option").forEach((card) =>
+    card.addEventListener("click", () => {
+      customBgColor = null;
+      document.querySelectorAll("#bg-presets .color-preset").forEach((b) => b.classList.remove("active"));
+      applyCustomBg();
+    })
+  );
+
+  // ==========================================
+  // FITUR BARU: BORDER STYLE — Event Listeners
+  // ==========================================
+
+  document.querySelectorAll(".border-style-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".border-style-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      currentBorderStyle = btn.dataset.style;
+      applyBorderToSlots();
+    });
+  });
+
+  // Preset warna border
+  document.querySelectorAll("#border-presets .border-preset").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("#border-presets .border-preset").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      customBorderColor = btn.dataset.color;
+      document.getElementById("custom-border-color").value = customBorderColor;
+      applyBorderToSlots();
+    });
+  });
+
+  document.getElementById("custom-border-color").addEventListener("input", (e) => {
+    customBorderColor = e.target.value;
+    document.querySelectorAll("#border-presets .border-preset").forEach((b) => b.classList.remove("active"));
+    applyBorderToSlots();
+  });
 
   // ==========================================
   // 7. JEPRET FOTO & COUNTDOWN
@@ -702,10 +1135,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const vW = video.videoWidth;
     const vH = video.videoHeight;
     const videoRatio = vW / vH;
-    let drawW = vW,
-      drawH = vH,
-      startX = 0,
-      startY = 0;
+    let drawW = vW, drawH = vH, startX = 0, startY = 0;
     if (currentRatio > videoRatio) {
       drawH = vW / currentRatio;
       startY = (vH - drawH) / 2;
@@ -716,27 +1146,58 @@ document.addEventListener("DOMContentLoaded", () => {
 
     canvas.width = drawW;
     canvas.height = drawH;
+    ctx.save();
     ctx.translate(canvas.width, 0);
     ctx.scale(-1, 1);
 
-    // Render Video Kamera + Filter
-    ctx.filter = currentFilter;
-    ctx.drawImage(video, startX, startY, drawW, drawH, 0, 0, drawW, drawH);
+    if (bgRemoveEnabled && segmentationReady) {
+      // arCanvas sudah berisi compositing yang sudah di-mirror
+      // Gambar langsung ke canvas output tanpa flip tambahan
+      ctx.restore(); // batalkan transform mirror
+      ctx.save();
 
-    // Render AR AI Canvas (Tanpa filter warna agar stiker tetap original)
-    ctx.filter = "none";
-    if (currentAR !== "none") {
+      // Background pengganti
+      if (bgReplaceType === "color") {
+        ctx.fillStyle = bgSolidColor;
+        ctx.fillRect(0, 0, drawW, drawH);
+      } else if (bgReplaceType === "gradient") {
+        const grad = ctx.createLinearGradient(0, 0, drawW, drawH);
+        grad.addColorStop(0, bgGradient1);
+        grad.addColorStop(1, bgGradient2);
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, drawW, drawH);
+      } else if (bgReplaceType === "blur") {
+        // blur dari video asli, lalu mirror
+        ctx.save();
+        ctx.translate(drawW, 0);
+        ctx.scale(-1, 1);
+        ctx.filter = "blur(18px)";
+        ctx.drawImage(video, startX, startY, drawW, drawH, 0, 0, drawW, drawH);
+        ctx.filter = "none";
+        ctx.restore();
+      }
+
+      // Gambar arCanvas (orang+bg yang sudah di-composit dan di-mirror)
       ctx.drawImage(arCanvas, startX, startY, drawW, drawH, 0, 0, drawW, drawH);
+      ctx.restore();
+    } else {
+      // Normal: gambar video + filter
+      ctx.filter = currentFilter;
+      ctx.drawImage(video, startX, startY, drawW, drawH, 0, 0, drawW, drawH);
+      ctx.filter = "none";
+      // AR overlay (neko/glasses/bunny)
+      if (currentAR !== "none") {
+        ctx.drawImage(arCanvas, startX, startY, drawW, drawH, 0, 0, drawW, drawH);
+      }
     }
+    ctx.restore();
 
     const imgUrl = canvas.toDataURL("image/jpeg", 0.9);
     const imgEl = document.createElement("img");
     imgEl.src = imgUrl;
     imgEl.classList.add("gallery-item");
     imgEl.addEventListener("click", () => {
-      document
-        .querySelectorAll(".gallery-item")
-        .forEach((el) => el.classList.remove("selected"));
+      document.querySelectorAll(".gallery-item").forEach((el) => el.classList.remove("selected"));
       imgEl.classList.add("selected");
       selectedImageSrc = imgUrl;
     });
@@ -1163,7 +1624,6 @@ document.addEventListener("DOMContentLoaded", () => {
           ctx.shadowBlur = 15;
           ctx.shadowOffsetX = 5;
           ctx.shadowOffsetY = 5;
-          // Gambar ulang foto dengan shadow (karena drawImage sudah dipanggil sebelumnya, kita timpa border soft)
           ctx.strokeStyle = "rgba(255,255,255,0.8)";
           ctx.lineWidth = 4;
           ctx.strokeRect(drawX, drawY, photoWidth, photoHeight);
@@ -1260,91 +1720,55 @@ document.addEventListener("DOMContentLoaded", () => {
         imagesLoaded++;
 
         if (imagesLoaded === photoCount) {
-          // Logika Drag & Drop Stiker (Mouse + Touch)
-          let draggedSticker = null;
-          let offsetX = 0,
-            offsetY = 0;
+          // Render semua stiker (emoji + teks) ke canvas
+          const allStickers = frameWorkspace.querySelectorAll(".draggable-sticker, .draggable-text-sticker");
+          const wsRect = frameWorkspace.getBoundingClientRect();
 
-          // Fungsi pembantu untuk mendapatkan posisi X/Y (baik mouse maupun sentuhan)
-          function getPos(e) {
-            return e.touches
-              ? { x: e.touches[0].clientX, y: e.touches[0].clientY }
-              : { x: e.clientX, y: e.clientY };
-          }
+          allStickers.forEach((st) => {
+            const scaleX = canvas.width / wsRect.width;
+            const scaleY = canvas.height / wsRect.height;
+            const cx = (parseFloat(st.style.left) / 100) * canvas.width;
+            const cy = (parseFloat(st.style.top) / 100) * canvas.height;
+            const rot = parseFloat(st.dataset.rotation || 0) * (Math.PI / 180);
+            const sc  = parseFloat(st.dataset.scale || 1);
 
-          stickerBtns.forEach((btn) => {
-            btn.addEventListener("click", () => {
-              const stickerEl = document.createElement("div");
-              stickerEl.className = "draggable-sticker";
-              stickerEl.textContent = btn.textContent;
-              stickerEl.style.left = "45%";
-              stickerEl.style.top = "45%";
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(rot);
 
-              stickerEl.addEventListener("dblclick", () => stickerEl.remove());
-
-              // Event untuk MULAI geser (Mouse & Touch)
-              const startDrag = (e) => {
-                e.preventDefault(); // Mencegah scroll layar saat menyentuh stiker
-                draggedSticker = stickerEl;
-                const pos = getPos(e);
-                const rect = stickerEl.getBoundingClientRect();
-                offsetX = pos.x - rect.left;
-                offsetY = pos.y - rect.top;
-                stickerEl.style.zIndex = 100;
-                stickerEl.style.cursor = "grabbing";
-              };
-
-              stickerEl.addEventListener("mousedown", startDrag);
-              stickerEl.addEventListener("touchstart", startDrag, {
-                passive: false,
-              });
-
-              frameWorkspace.appendChild(stickerEl);
-            });
-          });
-
-          // Event untuk SEDANG geser
-          const moveDrag = (e) => {
-            if (!draggedSticker) return;
-            e.preventDefault();
-
-            const workspaceRect = frameWorkspace.getBoundingClientRect();
-            const pos = getPos(e);
-
-            // Hitung posisi baru relatif terhadap workspace
-            let newX = pos.x - workspaceRect.left - offsetX;
-            let newY = pos.y - workspaceRect.top - offsetY;
-
-            // Batasi agar tidak keluar bingkai
-            const maxW = workspaceRect.width - draggedSticker.clientWidth;
-            const maxH = workspaceRect.height - draggedSticker.clientHeight;
-
-            newX = Math.max(0, Math.min(newX, maxW));
-            newY = Math.max(0, Math.min(newY, maxH));
-
-            draggedSticker.style.left = `${newX}px`;
-            draggedSticker.style.top = `${newY}px`;
-          };
-
-          document.addEventListener("mousemove", moveDrag);
-          document.addEventListener("touchmove", moveDrag, { passive: false });
-
-          // Event untuk SELESAI geser
-          const endDrag = () => {
-            if (draggedSticker) {
-              draggedSticker.style.zIndex = 50;
-              draggedSticker.style.cursor = "grab";
-              draggedSticker = null;
+            if (st.classList.contains("draggable-text-sticker")) {
+              const fontSize = Math.round(16 * sc * Math.min(scaleX, scaleY));
+              ctx.font = `bold ${fontSize}px "DM Sans", sans-serif`;
+              ctx.textAlign = "center";
+              ctx.textBaseline = "middle";
+              const textW = ctx.measureText(st.textContent).width;
+              const padH = fontSize * 0.3;
+              const padV = fontSize * 0.2;
+              const boxW = textW + padH * 2;
+              const boxH = fontSize + padV * 2;
+              // Background pill
+              ctx.fillStyle = "rgba(0,0,0,0.55)";
+              ctx.beginPath();
+              ctx.roundRect(-boxW / 2, -boxH / 2, boxW, boxH, boxH / 2);
+              ctx.fill();
+              // Text
+              ctx.fillStyle = "#ffffff";
+              ctx.fillText(st.textContent, 0, 0);
+            } else {
+              const fontSize = Math.round(30 * sc * Math.min(scaleX, scaleY));
+              ctx.font = `${fontSize}px serif`;
+              ctx.textAlign = "center";
+              ctx.textBaseline = "middle";
+              ctx.fillText(st.textContent, 0, 0);
             }
-          };
 
-          document.addEventListener("mouseup", endDrag);
-          document.addEventListener("touchend", endDrag);
+            ctx.restore();
+          });
 
           // Cetak Teks Custom & Tanggal
           let footerText = customTextInput.value.trim();
 
-          // 1. CEK TEKS DEFAULT TEMA TERLEBIH DAHULU 
+          // 1. CEK TEKS DEFAULT TEMA TERLEBIH DAHULU
           if (!footerText) {
             if (currentTheme === "neko") footerText = "Purr-fect Memories 🐾";
             if (currentTheme === "cafe") footerText = "Coffee & Memories ☕";
@@ -1358,7 +1782,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (currentTheme === "wanted") footerText = "$1,000,000 REWARD";
           }
 
-          // 2. SIAPKAN TANGGAL
+          // 2. AMBIL TANGGAL (JIKA DICENTANG)
           let dateStr = "";
           if (showDateCheck.checked) {
             dateStr = new Date().toLocaleDateString("id-ID", {
@@ -1368,109 +1792,55 @@ document.addEventListener("DOMContentLoaded", () => {
             });
           }
 
-          // 3. TAMPILKAN TEKS DAN TANGGAL SECARA TERPISAH
+          // 3. RENDER TEKS KE CANVAS (Hanya 1x Render)
           if (footerText !== "" || dateStr !== "") {
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
+            
             let textColor = "#5c4b51";
             let fontStyle = 'bold 28px "Nunito"';
 
             // -- Kumpulan Tema Font --
             if (currentTheme === "film") textColor = "#ffffff";
-            if (currentTheme === "pixel") {
-              textColor = "#39ff14";
-              fontStyle = 'bold 24px "Courier New"';
-            }
+            if (currentTheme === "pixel") { textColor = "#39ff14"; fontStyle = 'bold 24px "Courier New"'; }
             if (currentTheme === "retro-os") fontStyle = 'bold 20px "Courier New"';
             if (currentTheme === "galaxy") textColor = "#ffffff";
-            if (currentTheme === "newspaper") {
-              textColor = "#111111";
-              fontStyle = 'bold 30px "Times New Roman"';
-            }
-            if (currentTheme === "cyberpunk") {
-              textColor = "#00ffff";
-              fontStyle = 'bold 24px "Courier New"';
-            }
-            if (currentTheme === "love") {
-              textColor = "#ffffff";
-              fontStyle = 'bold 32px "Comic Sans MS", cursive, sans-serif';
-            }
-            if (currentTheme === "watercolor") {
-              textColor = "#4a4a4a";
-              fontStyle = 'italic 26px "Georgia", serif';
-            }
-            if (currentTheme === "vhs") {
-              textColor = "#00ff00";
-              fontStyle = 'bold 22px "Courier New", monospace';
-            }
-            if (currentTheme === "sakura") {
-              textColor = "#d81b60";
-              fontStyle = 'bold 28px "Noto Serif JP", serif';
-            }
-            if (currentTheme === "cafe") {
-              textColor = "#6b4c3b";
-              fontStyle = 'bold 26px "Georgia", serif';
-            }
-            if (currentTheme === "polaroid") {
-              textColor = "#2c2c2c";
-              fontStyle = 'bold 22px "Courier New", monospace';
-            }
-            if (currentTheme === "tropical") {
-              textColor = "#e8913a";
-              fontStyle = 'bold 28px "Nunito", sans-serif';
-            }
-            if (currentTheme === "wanted") {
-              textColor = "#4a2e15";
-              fontStyle = 'bold 45px "Times New Roman", serif';
-            }
+            if (currentTheme === "newspaper") { textColor = "#111111"; fontStyle = 'bold 30px "Times New Roman"'; }
+            if (currentTheme === "cyberpunk") { textColor = "#00ffff"; fontStyle = 'bold 24px "Courier New"'; }
+            if (currentTheme === "love") { textColor = "#ffffff"; fontStyle = 'bold 32px "Comic Sans MS", cursive, sans-serif'; }
+            if (currentTheme === "watercolor") { textColor = "#4a4a4a"; fontStyle = 'italic 26px "Georgia", serif'; }
+            if (currentTheme === "vhs") { textColor = "#00ff00"; fontStyle = 'bold 22px "Courier New", monospace'; }
+            if (currentTheme === "sakura") { textColor = "#d81b60"; fontStyle = 'bold 28px "Noto Serif JP", serif'; }
+            if (currentTheme === "cafe") { textColor = "#6b4c3b"; fontStyle = 'bold 26px "Georgia", serif'; }
+            if (currentTheme === "polaroid") { textColor = "#2c2c2c"; fontStyle = 'bold 22px "Courier New", monospace'; }
+            if (currentTheme === "tropical") { textColor = "#e8913a"; fontStyle = 'bold 28px "Nunito", sans-serif'; }
+            if (currentTheme === "wanted") { textColor = "#4a2e15"; fontStyle = 'bold 45px "Times New Roman", serif'; }
 
             ctx.fillStyle = textColor;
 
-            // Hitung Titik Tengah Vertikal (Y)
+            // Hitung Posisi (Y)
             let textY = canvas.height - paddingBottom / 2;
             let dateY = textY;
 
-            // Jika ada teks DAN tanggal, pisahkan posisinya (teks utama ditarik ke atas, tanggal diturunkan)
+            // Jika KEDUANYA ADA, pisahkan posisinya atas-bawah
             if (footerText !== "" && dateStr !== "") {
-              textY = canvas.height - (paddingBottom / 2) - 15; // Teks utama naik
-              dateY = canvas.height - (paddingBottom / 2) + 20; // Tanggal turun
+              textY = canvas.height - (paddingBottom / 2) - 15; 
+              dateY = canvas.height - (paddingBottom / 2) + 20; 
             }
 
-            // Cetak Teks Utama
+            // -- EKSEKUSI GAMBAR TEKS UTAMA --
             if (footerText !== "") {
               ctx.font = fontStyle;
               ctx.fillText(footerText, canvas.width / 2, textY);
             }
 
-            // Cetak Tanggal (di baris bawah)
+            // -- EKSEKUSI GAMBAR TANGGAL --
             if (dateStr !== "") {
-              // Trik: Mengubah angka ukuran px di fontStyle tema menjadi ukuran 18px khusus untuk tanggal
               ctx.font = fontStyle.replace(/\d+px/, "18px"); 
-              ctx.globalAlpha = 0.8; // Dibuat sedikit transparan agar lebih estetik
+              ctx.globalAlpha = 0.8; 
               ctx.fillText(dateStr, canvas.width / 2, dateY);
-              ctx.globalAlpha = 1.0; // Reset ke normal
+              ctx.globalAlpha = 1.0; 
             }
-          
-
-            if (!footerText) {
-              if (currentTheme === "neko") footerText = "Purr-fect Memories 🐾";
-              if (currentTheme === "cafe") footerText = "Coffee & Memories ☕";
-              if (currentTheme === "polaroid")
-                footerText = "Captured Moments 📷";
-              if (currentTheme === "tropical") footerText = "Summer Vibes 🌴";
-              if (currentTheme === "galaxy") footerText = "Star Memories 🌌";
-              if (currentTheme === "pixel") footerText = "SCORE: 99999";
-              if (currentTheme === "watercolor")
-                footerText = "Art in Every Moment 🎨";
-              if (currentTheme === "vhs") footerText = "PLAY ▶ 1998";
-              if (currentTheme === "sakura") footerText = "桜の季節 🌸";
-              if (currentTheme === "wanted") footerText = "$1,000,000 REWARD";
-            }
-            ctx.fillText(
-              footerText,
-              canvas.width / 2,
-              canvas.height - paddingBottom / 2,
-            );
           }
 
           // Dekorasi Tema Tambahan
@@ -1577,13 +1947,137 @@ document.addEventListener("DOMContentLoaded", () => {
             }
           }
 
-          // Trigger Download
-          const finalLink = document.createElement("a");
-          finalLink.download = `nekobooth-${Date.now()}.png`;
-          finalLink.href = canvas.toDataURL("image/png", 1.0);
-          finalLink.click();
+          // Simpan hasil canvas ke state, lalu tampilkan modal export
+          lastRenderedDataURL = canvas.toDataURL("image/png", 1.0);
+          showExportModal(lastRenderedDataURL);
         }
       };
     });
   });
+
+  // ==========================================
+  // EXPORT MODAL & SHARE
+  // ==========================================
+  let lastRenderedDataURL = null;
+
+  function showExportModal(dataURL) {
+    document.getElementById("export-preview-img").src = dataURL;
+    document.getElementById("export-modal").classList.add("open");
+    // Reset pilihan format ke PNG
+    document.querySelectorAll(".fmt-btn").forEach(b => b.classList.remove("active"));
+    document.querySelector('.fmt-btn[data-fmt="png"]').classList.add("active");
+    currentExportFormat = "png";
+  }
+
+  document.getElementById("export-modal-close").addEventListener("click", () => {
+    document.getElementById("export-modal").classList.remove("open");
+  });
+
+  document.getElementById("export-modal").addEventListener("click", (e) => {
+    if (e.target === document.getElementById("export-modal"))
+      document.getElementById("export-modal").classList.remove("open");
+  });
+
+  let currentExportFormat = "png";
+
+  document.querySelectorAll(".fmt-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".fmt-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      currentExportFormat = btn.dataset.fmt;
+      // Update preview dengan format baru
+      if (lastRenderedDataURL && canvas) {
+        const mimeMap = { png: "image/png", jpg: "image/jpeg", webp: "image/webp" };
+        const qualMap = { png: 1.0, jpg: 0.92, webp: 0.9 };
+        const mime = mimeMap[currentExportFormat];
+        const qual = qualMap[currentExportFormat];
+        const newURL = canvas.toDataURL(mime, qual);
+        lastRenderedDataURL = newURL;
+        document.getElementById("export-preview-img").src = newURL;
+      }
+    });
+  });
+
+  // Tombol Download
+  document.getElementById("export-download-btn").addEventListener("click", () => {
+    if (!lastRenderedDataURL) return;
+    const extMap = { png: "png", jpg: "jpg", webp: "webp" };
+    const link = document.createElement("a");
+    link.download = `picbooth-${Date.now()}.${extMap[currentExportFormat]}`;
+    link.href = lastRenderedDataURL;
+    link.click();
+  });
+
+  // Tombol Share (Web Share API — native mobile)
+  document.getElementById("export-share-btn").addEventListener("click", async () => {
+    if (!lastRenderedDataURL) return;
+    const mimeMap = { png: "image/png", jpg: "image/jpeg", webp: "image/webp" };
+    const mime = mimeMap[currentExportFormat] || "image/png";
+
+    // Konversi dataURL ke File
+    const res = await fetch(lastRenderedDataURL);
+    const blob = await res.blob();
+    const file = new File([blob], `picbooth-${Date.now()}.${currentExportFormat}`, { type: mime });
+
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: "Foto dari Pic Booth ✨",
+          text: "Dibuat di Pic Booth — studio foto digitalku!",
+        });
+      } catch (err) {
+        if (err.name !== "AbortError") showShareFallback();
+      }
+    } else {
+      showShareFallback();
+    }
+  });
+
+  function showShareFallback() {
+    document.getElementById("share-fallback").classList.toggle("open");
+  }
+
+  // Copy link ke clipboard
+  document.getElementById("share-copy-btn").addEventListener("click", async () => {
+    if (!lastRenderedDataURL) return;
+    try {
+      const res = await fetch(lastRenderedDataURL);
+      const blob = await res.blob();
+      await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+      const btn = document.getElementById("share-copy-btn");
+      btn.textContent = "✅ Tersalin!";
+      setTimeout(() => btn.textContent = "📋 Copy Gambar", 2000);
+    } catch {
+      alert("Browser ini tidak mendukung copy gambar. Gunakan klik kanan → Simpan gambar.");
+    }
+  });
+
+  // Instagram — buka Instagram, user paste manual
+  document.getElementById("share-ig-btn").addEventListener("click", () => {
+    // Download dulu, lalu buka IG
+    const link = document.createElement("a");
+    link.download = `picbooth-${Date.now()}.${currentExportFormat}`;
+    link.href = lastRenderedDataURL;
+    link.click();
+    setTimeout(() => window.open("https://www.instagram.com", "_blank"), 800);
+  });
+
+  // Twitter / X
+  document.getElementById("share-tw-btn").addEventListener("click", () => {
+    const text = encodeURIComponent("Foto dari Pic Booth ✨ #picbooth #photobooth");
+    window.open(`https://twitter.com/intent/tweet?text=${text}`, "_blank");
+  });
+
+  // WhatsApp
+  document.getElementById("share-wa-btn").addEventListener("click", () => {
+    const text = encodeURIComponent("Foto dari Pic Booth ✨ Coba juga ya!");
+    // Download dulu
+    const link = document.createElement("a");
+    link.download = `picbooth-${Date.now()}.${currentExportFormat}`;
+    link.href = lastRenderedDataURL;
+    link.click();
+    setTimeout(() => window.open(`https://wa.me/?text=${text}`, "_blank"), 800);
+  });
+
 });
