@@ -1,8 +1,3 @@
-/* =============================================
-   PHOTOBOOTH AI PRO — REDESIGN
-   Aesthetic: Clean Studio / Soft Editorial
-   ============================================= */
-
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600&display=swap');
 
 :root {
@@ -400,6 +395,20 @@ body {
   pointer-events: none;
   transform: scaleX(-1);
   object-fit: cover;
+}
+
+#bg-overlay {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 1; 
+  pointer-events: none;
+  transform: scaleX(-1);
+  object-fit: cover;
+}
+
+.video-wrapper.bg-active #bg-overlay {
+  transform: none;
 }
 
 .countdown-text {
