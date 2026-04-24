@@ -42,8 +42,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // ==========================================
   const video = document.getElementById("camera-stream");
   const arCanvas = document.getElementById("ar-overlay");
-  const bgOverlayCanvas = document.getElementById("bg-overlay");
-  const bgOverlayCtx = bgOverlayCanvas.getContext("2d");
+const bgOverlayCanvas = document.getElementById("bg-overlay");
+const bgOverlayCtx = bgOverlayCanvas.getContext("2d", { willReadFrequently: true });
   const arCtx = arCanvas.getContext("2d");
   const captureBtn = document.getElementById("capture-btn");
   const gallery = document.getElementById("photo-gallery");
