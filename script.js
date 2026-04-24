@@ -1139,34 +1139,22 @@ document.addEventListener("DOMContentLoaded", () => {
     ctx.scale(-1, 1);
 
     if (bgRemoveEnabled && segmentationReady) {
-      // arCanvas sudah berisi compositing yang sudah di-mirror
-      // Gambar langsung ke canvas output tanpa flip tambahan
-      ctx.restore(); // batalkan transform mirror
+      ctx.restore(); 
       ctx.save();
-
-      // Background pengganti
-      if (bgReplaceType === "color") {
-        ctx.fillStyle = bgSolidColor;
-        ctx.fillRect(0, 0, drawW, drawH);
-      } else if (bgReplaceType === "gradient") {
-        const grad = ctx.createLinearGradient(0, 0, drawW, drawH);
-        grad.addColorStop(0, bgGradient1);
-        grad.addColorStop(1, bgGradient2);
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, drawW, drawH);
-      } else if (bgReplaceType === "blur") {
-        // blur dari video asli, lalu mirror
-        ctx.save();
-        ctx.translate(drawW, 0);
-        ctx.scale(-1, 1);
-        ctx.filter = "blur(18px)";
-        ctx.drawImage(video, startX, startY, drawW, drawH, 0, 0, drawW, drawH);
-        ctx.filter = "none";
-        ctx.restore();
+      
+      // Gambar hasil background removal
+      ctx.drawImage(bgOverlayCanvas, startX, startY, drawW, drawH, 0, 0, drawW, drawH);
+      
+      // Kembalikan transformasi mirror untuk AR
+      ctx.restore();
+      ctx.save();
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+      
+      // Jika filter kacamata/telinga sedang aktif, tiban di atas background
+      if (currentAR !== "none") {
+        ctx.drawImage(arCanvas, startX, startY, drawW, drawH, 0, 0, drawW, drawH);
       }
-
-      // Gambar arCanvas (orang+bg yang sudah di-composit dan di-mirror)
-      ctx.drawImage(arCanvas, startX, startY, drawW, drawH, 0, 0, drawW, drawH);
       ctx.restore();
     } else {
       // Normal: gambar video + filter
