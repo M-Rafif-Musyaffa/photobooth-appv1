@@ -403,12 +403,10 @@ body {
   width: 100%; height: 100%;
   z-index: 1; 
   pointer-events: none;
-  transform: scaleX(-1);
-  object-fit: cover;
 }
-
-.video-wrapper.bg-active #bg-overlay {
-  transform: none;
+.video-wrapper.bg-active #bg-overlay,
+.video-wrapper.bg-active #ar-overlay {
+  transform: none; 
 }
 
 .countdown-text {
